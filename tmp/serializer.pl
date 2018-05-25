@@ -118,6 +118,8 @@ my $kProducer = Kafka::Producer->new( Connection => $kConnection ) or die "Kafka
 #	\@encoded
 #);
 
+
+# Ref: https://docs.confluent.io/current/schema-registry/docs/serializer-formatter.html?_ga=2.166617598.1188695207.1526911788-1213051144.1524553242#wire-format
 my $encodedRecord = pack('bN', &MAGIC_BYTE, $schema_id);
 Avro::BinaryEncoder->encode(
 	schema	=> $schema,

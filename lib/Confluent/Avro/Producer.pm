@@ -1,5 +1,7 @@
 package Confluent::Avro::Producer;
 
+=pod
+
 =head1 SYNOPSIS
 
     use Kafka::Connection;
@@ -39,7 +41,7 @@ package Confluent::Avro::Producer;
 C<Confluent::Avro::Producer> main feature is to provide object-oriented API for 
 producing messages according to Confluent Schemaregistry and Avro serialization.
 
-C<Confluent::Avro::Producer> inerhits from L<Kafka::Producer>.
+C<Confluent::Avro::Producer> inerhits from and extends L<Kafka::Producer|Kafka::Producer>.
 
 =cut
 
@@ -64,8 +66,8 @@ use Avro::DataFileWriter;
 #use Avro::Protocol;
 use Avro::Schema;
 
-use Kafka qw($BITS64);
-use Kafka::Connection;
+#use Kafka qw($BITS64);
+#use Kafka::Connection;
 
 use constant MAGIC_BYTE => 0;
 
@@ -81,133 +83,96 @@ our $VERSION = '0.01';
 
 Creates new producer client object.
 
-C<new()> takes arguments in key-value pairs. The following arguments are currently recognized:
+C<new()> takes arguments in key-value pairs as described in L<Kafka::Producer|Kafka::Producer> from which it inherits.
+
+In addition, takes in the following arguments:
 
 =over 3
 
-=item C<Connection =E<gt> $connection>
+=item C<SchemaRegistry =E<gt> $schema_registry> (B<mandatory>)
 
-C<$connection> is the L<Kafka::Connection|Kafka::Connection> object responsible for communication with
-the Apache Kafka cluster.
-
-=item C<ClientId =E<gt> $client_id>
-
-This is a user supplied identifier (string) for the client application.
-
-If C<ClientId> is not passed to constructor, its value will be automatically assigned
-(to string C<'producer'>).
-
-=item C<RequiredAcks =E<gt> $acks>
-
-The C<$acks> should be an int16 signed integer.
-
-Indicates how many acknowledgements the servers should receive before responding to the request.
-
-If it is C<$NOT_SEND_ANY_RESPONSE> the server does not send any response.
-
-If it is C<$WAIT_WRITTEN_TO_LOCAL_LOG>, (default)
-the server will wait until the data is written to the local log before sending a response.
-
-If it is C<$BLOCK_UNTIL_IS_COMMITTED>
-the server will block until the message is committed by all in sync replicas before sending a response.
-
-C<$NOT_SEND_ANY_RESPONSE>, C<$WAIT_WRITTEN_TO_LOCAL_LOG>, C<$BLOCK_UNTIL_IS_COMMITTED>
-can be imported from the L<Kafka|Kafka> module.
-
-=item C<Timeout =E<gt> $timeout>
-
-This provides a maximum time the server can await the receipt
-of the number of acknowledgements in C<RequiredAcks>.
-
-The C<$timeout> in seconds, could be any integer or floating-point type not bigger than int32 positive integer.
-
-Optional, default = C<$REQUEST_TIMEOUT>.
-
-C<$REQUEST_TIMEOUT> is the default timeout that can be imported from the
-L<Kafka|Kafka> module.
+C<$schema_registry> is the L<Confluent::SchemaRegistry|Confluent::SchemaRegistry> object responsible for communication with
+the Confluent Schema Registry that controls the schema version to use to validate and serialize messages.
 
 =back
 
 =cut
 
 sub new {
-	#	Connection => $connection
-	#	ClientId => $client_id
-	#	RequiredAcks => $acks
-	#	Timeout => $timeout
     my $this  = shift;
     my $class = ref($this) || $this;
-	my $self = $class->SUPER::new(@_);
+    my $schema_registry_class = 'Confluent::SchemaRegistry';
+    my %params = @_;
+
+	# Check SchemaRegistry param
+    die "Missing SchemaRegistry param"
+    	unless exists $params{SchemaRegistry};
+    die "SchemaRegistry param must be a $schema_registry_class instance object"
+    	unless ref($params{SchemaRegistry}) eq $schema_registry_class;
+    $schema_registry = delete $params{SchemaRegistry};
+    
+    # Use parent class constructor
+	my $self = $class->SUPER::new(%params);
+	
+	# Add ans internal reference to SchemaRegistry
+	$self->{__SCHEMA_REGISTRY} = $schema_registry;
+	
 	return bless($self, $class);
 }
 
+##### Private methods
+
+sub _schema_registry { $_[]->{__SCHEMA_REGISTRY} }
+
+
+
+##### Public methods
 
 =head2 METHODS
 
-The following methods are defined for the C<Kafka::Producer> class:
+The following methods are defined for the C<Kafka::Avro::Producer> class:
 
-=head3 C<send( $topic, $partition, $messages, $keys, $compression_codec )>
+=cut
+
+
+=head3 C<send( $topic, $partition, $messages, $keys, $compression_codec, $json_schema )>
 
 Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 
 Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
 
-C<send()> takes the following arguments:
+In addition to L<Kafka::Producer|Kafka::Producer> arguments, C<send()> takes extra arguments
+to validate key/value schemas against Schema Registry service.
 
 =over 3
 
-=item C<$topic>
+=item C<$key_schema>, C<$value_schema>
 
-The C<$topic> must be a normal non-false string of non-zero length.
+Both C<$key_schema> and C<$value_schema> are optional JSON strings who represent the schemas used 
+to validate and serialize key/value messages.
 
-=item C<$partition>
+These schemas are validated against C<$schema_registry> and, if compliant, they are added to the registry
+under the C<$topic+'key'> or C<$topic+'value'> subjects.
 
-The C<$partition> must be a non-negative integer.
-
-=item C<$messages>
-
-The C<$messages> is an arbitrary amount of data (a simple data string or
-a reference to an array of the data strings).
-
-=item C<$keys>
-
-The C<$keys> are optional message keys, for partitioning with each message,
-so the consumer knows the partitioning key.
-This argument should be either a single string (common key for all messages),
-or an array of strings with length matching messages array.
-
-=item C<$compression_codec>
-
-Optional.
-
-C<$compression_codec> sets the required type of C<$messages> compression,
-if the compression is desirable.
-
-Supported codecs:
-C<$COMPRESSION_NONE>,
-C<$COMPRESSION_GZIP>,
-C<$COMPRESSION_SNAPPY>,
-C<$COMPRESSION_LZ4>.
-The defaults that can be imported from the L<Kafka|Kafka> module.
-
-=item C<$timestamps>
-
-Optional.
-
-This is the timestamps of the C<$messages>.
-
-This argument should be either a single number (common timestamp for all messages),
-or an array of integers with length matching messages array.
-
-Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
-
-B<WARNING>: timestamps supported since Kafka 0.10.0.
-
-
-Do not use C<$Kafka::SEND_MAX_ATTEMPTS> in C<Kafka::Producer-<gt>send> request to prevent duplicates.
+If an expected schema isn't provided, latest version from Schema Registry is used according to the related 
+subject (key or value). 
 
 =back
+
+You can also specify arguments in key-value flavour; the following two calls are identical: 
+
+  $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
+  
+  $producer->send(
+  	topic => $topic, 
+  	partition => $partition, 
+  	messages => $messages, 
+  	keys => $keys, 
+  	compression_codec => $compression_codec, 
+  	key_schema => $key_schema, 
+  	value_schema => $value_schema
+  );    
 
 =cut
 
