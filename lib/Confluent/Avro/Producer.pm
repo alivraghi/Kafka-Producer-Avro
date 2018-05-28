@@ -109,7 +109,7 @@ sub new {
     	unless exists $params{SchemaRegistry};
     die "SchemaRegistry param must be a $schema_registry_class instance object"
     	unless ref($params{SchemaRegistry}) eq $schema_registry_class;
-    $schema_registry = delete $params{SchemaRegistry};
+    my $schema_registry = delete $params{SchemaRegistry};
     
     # Use parent class constructor
 	my $self = $class->SUPER::new(%params);
@@ -122,7 +122,7 @@ sub new {
 
 ##### Private methods
 
-sub _schema_registry { $_[]->{__SCHEMA_REGISTRY} }
+sub _schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
 
 
 
@@ -165,21 +165,41 @@ You can also specify arguments in key-value flavour; the following two calls are
   $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
   
   $producer->send(
-  	topic => $topic, 
-  	partition => $partition, 
-  	messages => $messages, 
-  	keys => $keys, 
+  	topic             => $topic, 
+  	partition         => $partition, 
+  	messages          => $messages, 
+  	keys              => $keys, 
   	compression_codec => $compression_codec, 
-  	key_schema => $key_schema, 
-  	value_schema => $value_schema
+  	key_schema        => $key_schema, 
+  	value_schema      => $value_schema
   );    
 
 =cut
 
 sub send {
 	my $self = shift;
-	my ($topic, $partition, $messages, $keys, $compression_codec) = @_;
-	return $self->SUPER::send($topic, $partition, $messages, $keys, $compression_codec);
+	my @params = @_;
+	my %params = ();
+	if (scalar(@params) % 2 == 0) {
+		# may be a named-params call
+		my @keys = qw/topic partition messages keys compression_codec key_schema value_schema/;
+		my $sep = $";
+		$" = '|';
+		my $hash_check = qr(@keys);
+		$" = $sep;
+		%params = @params;
+		if ( grep $hash_check, keys(%params) ) {
+			# it is a named-params call: create send() method positional params list
+			@params = (
+				defined($params{topic}) ? $params{topic} : undef, 
+				defined($params{partition}) ? $params{partition} : undef, 
+				defined($params{messages}) ? $params{messages} : undef, 
+				defined($params{keys}) ? $params{keys} : undef, 
+				defined($params{compression_codec}) ? $params{compression_codec} : undef 
+			);
+		}
+	}
+	return $self->SUPER::send(@params);
 }
 
 #
