@@ -124,6 +124,7 @@ sub new {
 
 sub _schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
 
+sub _nvl { defined($_[1]) ? $_[1] : $_[2] }
 
 
 ##### Public methods
@@ -191,11 +192,11 @@ sub send {
 		if ( grep $hash_check, keys(%params) ) {
 			# it is a named-params call: create send() method positional params list
 			@params = (
-				defined($params{topic}) ? $params{topic} : undef, 
-				defined($params{partition}) ? $params{partition} : undef, 
-				defined($params{messages}) ? $params{messages} : undef, 
-				defined($params{keys}) ? $params{keys} : undef, 
-				defined($params{compression_codec}) ? $params{compression_codec} : undef 
+				$self->_nvl($params{topic}), 
+				$self->_nvl($params{partition}), 
+				$self->_nvl($params{messages}), 
+				$self->_nvl($params{keys}), 
+				$self->_nvl($params{compression_codec}) 
 			);
 		}
 	}
