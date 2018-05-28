@@ -31,12 +31,26 @@ my $partition = 0;
 my $messages = ['Message time ' . localtime];
 my $keys = undef;
 my $compression_codec = undef;
-my $res = $cap->send($topic, $partition, $messages, $keys, $compression_codec);
-ok(defined $res, 'Message(s) sent to topic \'' . $topic . '\'');
-isa_ok($res, 'HASH', 'Message(s) sent');
+my $key_schema = undef;
+my $value_schema = <<VALUE_SCHEMA;
+{
+	"type": "record",
+	"name": "myrecord",
+	"fields": [
+		{
+			"name": "f1",
+			"type": "string"
+		}
+	]
+}
+VALUE_SCHEMA
+my $unwanted_param = 0;
+my $res;
+#my $res = $cap->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema, $unwanted_param);
+#isa_ok($res, 'HASH', 'Message(s) sent with positional params');
 
-$res = $cap->send(topic=>$topic, partition=>$partition, messages=>$messages, keys=>$keys, compressione_codec=>$compression_codec);
-ok(defined $res, 'Message(s) sent to topic \'' . $topic . '\'');
-isa_ok($res, 'HASH', 'Message(s) sent');
+$res = $cap->send(topic=>$topic, partition=>$partition, messages=>$messages, keys=>$keys, compressione_codec=>$compression_codec, key_schema=>$key_schema, value_schema=>$value_schema, unwanted_param=>$unwanted_param);
+isa_ok($res, 'HASH', 'Message(s) sent with named params');
+
 
 $kc->close();

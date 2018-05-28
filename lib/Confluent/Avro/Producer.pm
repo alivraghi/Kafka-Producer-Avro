@@ -124,8 +124,6 @@ sub new {
 
 sub _schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
 
-sub _nvl { defined($_[1]) ? $_[1] : $_[2] }
-
 
 ##### Public methods
 
@@ -143,17 +141,20 @@ Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
 
-In addition to L<Kafka::Producer|Kafka::Producer> arguments, C<send()> takes extra arguments
-to validate key/value schemas against Schema Registry service.
+Despite L<Kafka::Producer|Kafka::Producer>C<->send()> method that expects positional arguments:
+
+  $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
+
+C<Confluent::Avro::Producer->send()> method looks for named parameters and takes extra arguments
 
 =over 3
 
-=item C<$key_schema>, C<$value_schema>
+=item C<key_schema =E<gt> $key_schema> and C<value_schema =E<gt> $value_schema>
 
-Both C<$key_schema> and C<$value_schema> are optional JSON strings who represent the schemas used 
-to validate and serialize key/value messages.
+Both C<$key_schema> and C<$value_schema> named parametrs are optional and provide JSON strings that represent 
+Avro schemas to validate and serialize key and value messages.
 
-These schemas are validated against C<$schema_registry> and, if compliant, they are added to the registry
+These schemas are validated against C<schema_registry> and, if compliant, they are added to the registry
 under the C<$topic+'key'> or C<$topic+'value'> subjects.
 
 If an expected schema isn't provided, latest version from Schema Registry is used according to the related 
@@ -161,10 +162,6 @@ subject (key or value).
 
 =back
 
-You can also specify arguments in key-value flavour; the following two calls are identical: 
-
-  $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
-  
   $producer->send(
   	topic             => $topic, 
   	partition         => $partition, 
@@ -179,29 +176,19 @@ You can also specify arguments in key-value flavour; the following two calls are
 
 sub send {
 	my $self = shift;
-	my @params = @_;
-	my %params = ();
-	if (scalar(@params) % 2 == 0) {
-		# may be a named-params call
-		my @keys = qw/topic partition messages keys compression_codec key_schema value_schema/;
-		my $sep = $";
-		$" = '|';
-		my $hash_check = qr(@keys);
-		$" = $sep;
-		%params = @params;
-		if ( grep $hash_check, keys(%params) ) {
-			# it is a named-params call: create send() method positional params list
-			@params = (
-				$self->_nvl($params{topic}), 
-				$self->_nvl($params{partition}), 
-				$self->_nvl($params{messages}), 
-				$self->_nvl($params{keys}), 
-				$self->_nvl($params{compression_codec}) 
-			);
-		}
-	}
-	return $self->SUPER::send(@params);
+	my %params = @_;
+	return $self->SUPER::send(
+		$params{topic},
+		$params{partition},
+		$params{messages},
+		$params{keys},
+		$params{compression_codec}
+	);
 }
+
+1;
+
+__END__
 
 #
 # Definizione schema di validazione AVRO
