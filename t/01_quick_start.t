@@ -26,7 +26,7 @@ isa_ok($sr, 'Confluent::SchemaRegistry');
 my $cap = new_ok($class => [ 'Connection',$kc , 'SchemaRegistry',$sr ], qq/Valid REST client config/);
 isa_ok($cap, $class);
 
-my $topic = 'confluent-avro-producer-test';
+my $topic = 'test-elasticsearch-sink';
 my $partition = 0;
 my $messages = [ { 'f1' => 'name ' . localtime } ];
 my $keys = undef;

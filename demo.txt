@@ -1,0 +1,46 @@
+# Start Confluent DEV environment
+confluent start
+
+# Start ElasticSearch
+elasticsearch
+
+	# zookeeper:2181 (+ 13353)
+	# kafka:9092
+	# schema-registry:8081
+	# kafka-rest:
+	# connect:
+	# ksql:
+	# control-center:
+	# elasticsearch:9200
+
+# Load elasticsearch-sink Kafka Connector
+confluent load elasticsearch-sink
+
+# Start Kafka Avro console PRODUCER
+kafka-avro-console-producer --broker-list localhost:9092 --topic test-elasticsearch-sink --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"f1","type":"string"}]}'
+
+# Start Kafka Avro console CONSUMER
+kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic test-elasticsearch-sink
+
+# Read Elasticsearch "test-elasticsearch-sink" index
+curl -X GET "localhost:9200/test-elasticsearch-sink" | json_pp
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+# Delete Elasticsearch "test-elasticsearch-sink" index
+curl -X DELETE "localhost:9200/test-elasticsearch-sink" | json_pp
+
+# Kafka topics data directory (if needed)
+cd $(cat /tmp/confluent.current)/kafka/data/
+
+# Empty "test-elasticsearch-sink" topic 
+kafka-topics --zookeeper localhost:2181 --delete --topic test-elasticsearch-sink
+
+# Unload elasticsearch-sink Kafka Connector
+confluent unload elasticsearch-sink
+
+# Stop Confluent DEV environment
+confluent stop
+
