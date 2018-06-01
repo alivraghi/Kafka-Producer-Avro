@@ -14,22 +14,10 @@ package Confluent::Avro::Producer;
     # TODO Interact with Avro & SchemaRegistry before sending messages
 
     # Sending a single message
-    my $response = $producer->send(
-        'mytopic',          # topic
-        0,                  # partition
-        { ... }    # message
-    );
+    my $response = $producer->send(...);
 
     # Sending a series of messages
-    $response = $producer->send(
-        'mytopic',          # topic
-        0,                  # partition
-        [                   # messages
-            { ... },
-            { ... },
-            { ... }
-        ]
-    );
+    $response = $producer->send(...);
 
     # Closes the producer and cleans up
     undef $producer;
@@ -58,21 +46,11 @@ $Data::Dumper::Useqq = 1;
 
 use base 'Kafka::Producer';
 
-use Avro::BinaryDecoder;
 use Avro::BinaryEncoder;
-use Avro::DataFile;
-use Avro::DataFileReader;
-use Avro::DataFileWriter;
-#use Avro::Protocol;
 use Avro::Schema;
-
-#use Kafka qw($BITS64);
-#use Kafka::Connection;
-
-use constant MAGIC_BYTE => 0;
-
 use Confluent::SchemaRegistry;
 
+use constant MAGIC_BYTE => 0; 
 
 our $VERSION = '0.01';
 
@@ -122,7 +100,10 @@ sub new {
 
 ##### Private methods
 
-sub _schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
+sub _clear_error { $_[0]->_set_error() } 
+sub _set_error   { $_[0]->{__ERROR} = $_[1] } 
+sub _get_error   { $_[0]->{__ERROR} }
+
 
 
 ##### Public methods
@@ -132,6 +113,11 @@ sub _schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
 The following methods are defined for the C<Kafka::Avro::Producer> class:
 
 =cut
+
+
+sub schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
+sub get_error { $_[0]->_get_error() }
+
 
 
 =head3 C<send( $topic, $partition, $messages, $keys, $compression_codec, $json_schema )>
@@ -145,7 +131,19 @@ Despite L<Kafka::Producer|Kafka::Producer>C<->send()> method that expects positi
 
   $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
 
-C<Confluent::Avro::Producer->send()> method looks for named parameters and takes extra arguments
+C<Confluent::Avro::Producer->send()> method looks for named parameters:
+
+  $producer->send(
+  	topic             => $topic, 
+  	partition         => $partition, 
+  	messages          => $messages, 
+  	keys              => $keys, 
+  	compression_codec => $compression_codec, 
+  	key_schema        => $key_schema, 
+  	value_schema      => $value_schema
+  );    
+
+Extra arguments:
 
 =over 3
 
@@ -162,119 +160,120 @@ subject (key or value).
 
 =back
 
-  $producer->send(
-  	topic             => $topic, 
-  	partition         => $partition, 
-  	messages          => $messages, 
-  	keys              => $keys, 
-  	compression_codec => $compression_codec, 
-  	key_schema        => $key_schema, 
-  	value_schema      => $value_schema
-  );    
-
 =cut
 
 sub send {
 	my $self = shift;
 	my %params = @_;
+	my $schema_id;
+	my $avro_schema;
+	my $sr = $self->schema_registry();
+	my $key_subject = $params{topic} . '-key';
+	my $value_subject = $params{topic} . '-value';
+
+	$self->_clear_error();
+	
+	# FIXME need to use caching w/ TTL to avoid these checks for every call
+	
+	# If a schema is supplied...	
+	if ($params{value_schema}) {
+		
+		# If the subject exixts...
+		my $subjects = $sr->get_subjects();
+		if (grep(/^$value_subject$/, @$subjects) ) {
+			
+			# ...check if it already exists in registry
+			my $schema_info = $sr->check_schema(
+				SUBJECT => $params{topic},
+				TYPE => 'value',
+				SCHEMA => $params{value_schema} 
+			);
+			if ( defined $schema_info ) {
+				
+				$schema_id   = $schema_info->{id};
+				$avro_schema = $schema_info->{schema};
+
+			# ...if it does not already exist in the registry....
+			} else {
+			
+				# ...test new schema compliancy against latest version 
+				my $compliant = $sr->test_schema(
+					SUBJECT => $params{topic},
+					TYPE => 'value',
+					SCHEMA => $params{value_schema}
+				);
+				$self->_set_error('Schema not compliant with latest one from registry') &&
+					return undef
+						unless $compliant;
+			
+			}
+			
+		}
+		
+		# ...if a previous id for the schema is not available, try to add the one supplied to the registry....
+		unless ($schema_id) {
+					  
+			# ...procede adding it to the registry
+			$schema_id = $sr->add_schema(
+				SUBJECT => $params{topic},
+				TYPE => 'value',
+				SCHEMA => $params{value_schema}
+			);
+			$self->_set_error('Error adding schema to registry: ' . encode_json($sr->get_error())) &&
+				return undef
+					unless $schema_id;
+			
+			# ...and bless new schema into an Avro schema object 
+			$avro_schema = Avro::Schema->parse($params{value_schema});
+			
+		}
+		
+	} else {
+		
+		# retreive latest schema for the topic value
+		my $schema_info = $sr->get_schema(
+			SUBJECT => $params{topic},
+			TYPE => 'value'
+		);
+		if ( defined $schema_info ) {
+			
+			$schema_id = $schema_info->{id};
+			$avro_schema = $schema_info->{schema};
+			
+		} else {
+			$self->_set_error("No schema in registry for subject " . $params{topic} . '-' . 'value') &&
+				return undef
+					unless $schema_info;
+		}
+		 
+	}
+
+	# Avro encoding of messages
+	my $messages = [];
+	foreach my $message (@{$params{messages}}) {
+		my $enc = pack('bN', &MAGIC_BYTE, $schema_id);
+		Avro::BinaryEncoder->encode(
+			schema	=> $avro_schema,
+			data	=> $message,
+			emit_cb	=> sub {
+				$enc .= ${ $_[0] };
+			}
+		);
+		push @$messages, $enc;
+	}
+	
+	# Send messages through Kafka::Producer parent class
 	return $self->SUPER::send(
 		$params{topic},
 		$params{partition},
-		$params{messages},
+		$messages,
 		$params{keys},
 		$params{compression_codec}
 	);
+	
 }
 
 1;
 
 __END__
 
-#
-# Definizione schema di validazione AVRO
-#
-my $schema = Avro::Schema->parse(<<SCHEMA);
-{
-	"type": "record",
-	"name": "myrecord",
-	"fields": [
-		{
-			"name": "f1",
-			"type": "string"
-		}
-	]
-}
-SCHEMA
-my $schema_subject = 'test-elasticsearch-sink-value';
-my $schema_version = 1;
-my $schema_id = 1;
-
-
-# common information
-#print 'This is Kafka package ', $Kafka::VERSION, "\n";
-#print 'You have a ', $BITS64 ? '64' : '32', ' bit system', "\n";
-
-# kafka setup
-my $kConnection = Kafka::Connection->new( host => 'localhost' ) or die "Kafka::Connection failure: $!";
-my $kProducer = Kafka::Producer->new( Connection => $kConnection ) or die "Kafka::Producer failure: $!";
-
-#my $count = 100;
-##
-## Creazione encoder AVRO
-##
-#my @encoded = ();
-#for (my $i=0; $i<$count; $i++) {
-#	push @encoded, '';
-#	Avro::BinaryEncoder->encode(
-#		schema	=> $schema,
-#		data	=> { f1 => sprintf("%04d", $i) },
-#		emit_cb	=> sub {
-#			$encoded[$i] .= ${ $_[0] }
-#		}
-#	);
-#}
-##print 'ENCODED: ', Dumper \@encoded;
-#
-#my $res = $kProducer->send(
-#	'test-elasticsearch-sink', # topic
-#	0, # partition
-#	\@encoded
-#);
-
-my $encodedRecord = pack('bN', &MAGIC_BYTE, $schema_id);
-Avro::BinaryEncoder->encode(
-	schema	=> $schema,
-	data	=> { f1 => 'alvaro' },
-	emit_cb	=> sub {
-		$encodedRecord .= ${ $_[0] };
-	}
-);
-print 'encodedRecord: ', Dumper $encodedRecord;
-my $res = $kProducer->send(
-	'test-elasticsearch-sink',	# topic
-	0,							# partition
-	$encodedRecord,				# record(s)
-#	,							# keys(s)
-#	time						# timestamp(s)	
-);
-
-print 'SEND RESPONSE: ', Dumper $res;
-
-# my @decoded = ();
-# for (my $i=0; $i<$count; $i++) {
-# 	push @decoded, Avro::BinaryDecoder->decode(
-# 		writer_schema	=> $schema,
-# 		reader_schema	=> $schema,
-# 		reader			=> IO::String->new($encoded[$i]),
-# 	);
-# }
-# print 'DECODED: ', Dumper \@decoded;
-# 
-
-# cleaning up kafka
-undef $kProducer;
-$kConnection->close;
-undef $kConnection;
-
-
-1;

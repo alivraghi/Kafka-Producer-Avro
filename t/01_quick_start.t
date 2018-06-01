@@ -28,7 +28,7 @@ isa_ok($cap, $class);
 
 my $topic = 'confluent-avro-producer-test';
 my $partition = 0;
-my $messages = ['Message time ' . localtime];
+my $messages = [ { 'f1' => 'name ' . localtime } ];
 my $keys = undef;
 my $compression_codec = undef;
 my $key_schema = undef;
@@ -44,13 +44,89 @@ my $value_schema = <<VALUE_SCHEMA;
 	]
 }
 VALUE_SCHEMA
+my $value_schema_not_compliant = <<VALUE_SCHEMA;
+{
+	"type": "string",
+	"name": "myrecord"
+}
+VALUE_SCHEMA
+my $value_schema_bad = <<VALUE_SCHEMA;
+{
+	"typ": "string",
+	"name": "myrecord"
+}
+VALUE_SCHEMA
 my $unwanted_param = 0;
 my $res;
-#my $res = $cap->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema, $unwanted_param);
-#isa_ok($res, 'HASH', 'Message(s) sent with positional params');
 
-$res = $cap->send(topic=>$topic, partition=>$partition, messages=>$messages, keys=>$keys, compressione_codec=>$compression_codec, key_schema=>$key_schema, value_schema=>$value_schema, unwanted_param=>$unwanted_param);
-isa_ok($res, 'HASH', 'Message(s) sent with named params');
+# Clear Schema Registry subjects used for testing
+$cap->schema_registry()->delete_subject(SUBJECT => $topic, TYPE => 'key');
+$cap->schema_registry()->delete_subject(SUBJECT => $topic, TYPE => 'value');
 
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	value_schema=>$value_schema_bad
+);
+ok(!defined $res, 'No schema in registry and bad schema supplied: ' . $cap->_get_error());
+
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	value_schema=>$value_schema, 
+	unwanted_param=>$unwanted_param
+);
+isa_ok($res, 'HASH', 'Message(s) sent with new value schema');
+
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema
+);
+isa_ok($res, 'HASH', 'Message(s) sent by retreiving schema from registry');
+
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	value_schema=>$value_schema_not_compliant
+);
+ok(!defined $res, 'Incompatible schema: ' . $cap->_get_error());
+
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	value_schema=>$value_schema_bad
+);
+ok(!defined $res, 'Invalid schema: ' . $cap->_get_error());
+
+$res = $cap->send(
+	topic=>$topic.'BAD', 
+	partition=>$partition, 
+	messages=>$messages, 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	#value_schema=>$value_schema_bad
+);
+ok(!defined $res, 'No schema in registry: ' . $cap->_get_error());
 
 $kc->close();
