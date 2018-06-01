@@ -2,35 +2,53 @@
 confluent start
 
 # Start ElasticSearch
-elasticsearch
+elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 
-	# zookeeper:2181 (+ 13353)
+	# zookeeper:2181
 	# kafka:9092
 	# schema-registry:8081
 	# kafka-rest:
 	# connect:
 	# ksql:
 	# control-center:
-	# elasticsearch:9200
+	# elasticsearch:9200+9300
+
+# Retreive Elasticsearch indexes
+curl -X GET "localhost:9200/_cat/indices?v"
 
 # Load elasticsearch-sink Kafka Connector
 confluent load elasticsearch-sink
 
+# Retreive again Elasticsearch indexes
+curl -X GET "localhost:9200/_cat/indices?v"
+
+# List Schema Registry subjects
+curl -X GET http://localhost:8081/subjects | json_pp
+
 # Start Kafka Avro console PRODUCER
 kafka-avro-console-producer --broker-list localhost:9092 --topic test-elasticsearch-sink --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"f1","type":"string"}]}'
+
+# List Schema Registry subjects
+curl -X GET http://localhost:8081/subjects | json_pp
+
+# List "test-elasticsearch-sink-value" subject versions
+curl -X GET http://localhost:8081/subjects/test-elasticsearch-sink-value/versions | json_pp
 
 # Start Kafka Avro console CONSUMER
 kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic test-elasticsearch-sink
 
 # Read Elasticsearch "test-elasticsearch-sink" index
-curl -X GET "localhost:9200/test-elasticsearch-sink" | json_pp
+curl -X GET "localhost:9200/test-elasticsearch-sink?pretty"
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
+# Delete subject "test-elasticsearch-sink"
+curl -X DELETE http://localhost:8081/subjects/test-elasticsearch-sink-value
+
 # Delete Elasticsearch "test-elasticsearch-sink" index
-curl -X DELETE "localhost:9200/test-elasticsearch-sink" | json_pp
+curl -X DELETE "localhost:9200/test-elasticsearch-sink?pretty"
 
 # Kafka topics data directory (if needed)
 cd $(cat /tmp/confluent.current)/kafka/data/
@@ -43,4 +61,8 @@ confluent unload elasticsearch-sink
 
 # Stop Confluent DEV environment
 confluent stop
+
+# Stop Elasticsearch
+kill $(cat /tmp/.elasticsearch.pid)
+
 
