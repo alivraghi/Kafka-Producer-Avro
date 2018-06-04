@@ -17,7 +17,7 @@ elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 curl -X GET "localhost:9200/_cat/indices?v"
 
 # Load elasticsearch-sink Kafka Connector
-confluent load elasticsearch-sink
+confluent load elasticsearch-sink | json_pp
 
 # Retreive again Elasticsearch indexes
 curl -X GET "localhost:9200/_cat/indices?v"
@@ -38,14 +38,14 @@ curl -X GET http://localhost:8081/subjects/test-elasticsearch-sink-value/version
 kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic test-elasticsearch-sink
 
 # Read Elasticsearch "test-elasticsearch-sink" index
-curl -X GET "localhost:9200/test-elasticsearch-sink?pretty"
+curl -X GET "localhost:9200/test-elasticsearch-sink/_search?pretty"
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
 # Delete subject "test-elasticsearch-sink"
-curl -X DELETE http://localhost:8081/subjects/test-elasticsearch-sink-value
+curl -X DELETE http://localhost:8081/subjects/test-elasticsearch-sink-value?pretty
 
 # Delete Elasticsearch "test-elasticsearch-sink" index
 curl -X DELETE "localhost:9200/test-elasticsearch-sink?pretty"
@@ -64,5 +64,4 @@ confluent stop
 
 # Stop Elasticsearch
 kill $(cat /tmp/.elasticsearch.pid)
-
 
