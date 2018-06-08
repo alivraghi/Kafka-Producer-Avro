@@ -87,7 +87,7 @@ $res = $cap->send(
 	value_schema=>$value_schema, 
 	unwanted_param=>$unwanted_param
 );
-isa_ok($res, 'HASH', 'Message(s) sent with new value schema');
+isa_ok($res, 'HASH', 'Message(s) sent with new value schema: ' . $cap->_get_error());
 
 $res = $cap->send(
 	topic=>$topic, 
@@ -97,7 +97,7 @@ $res = $cap->send(
 	compressione_codec=>$compression_codec, 
 	key_schema=>$key_schema
 );
-isa_ok($res, 'HASH', 'Message(s) sent by retreiving schema from registry');
+isa_ok($res, 'HASH', 'Message(s) sent by retreiving schema from registry: ' . $cap->_get_error());
 
 $res = $cap->send(
 	topic=>$topic, 

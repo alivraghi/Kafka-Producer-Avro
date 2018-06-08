@@ -106,6 +106,8 @@ sub new {
 sub _encode {
 	my $schema_ref = shift;
 	my $payload = shift;
+	return undef
+		unless defined $payload;
 	my $encoded = pack('bN', &MAGIC_BYTE, $schema_ref->{id});
 	Avro::BinaryEncoder->encode(
 		schema	=> $schema_ref->{schema},
@@ -287,16 +289,51 @@ sub send {
 			schema => undef
 		}
 	};
+	my ($keys, $messages);
 
 	$self->_clear_error();
 	
-	# Get Avro schema for values
-	($avro_schemas->{value}->{id}, $avro_schemas->{value}->{schema}) = $self->_get_avro_schema($params{topic}, 'value', $params{value_schema});
-	return undef
-		unless defined $avro_schemas->{value}->{id} && defined $avro_schemas->{value}->{schema};
+	$self->_set_error('Missing topic param')
+		and return undef
+			unless defined $params{topic};
+	$self->_set_error('Missing partition param')
+		and return undef
+			unless defined $params{partition};
+	$self->_set_error('Missing messages')
+		and return undef
+			unless defined $params{messages};
+		
+	# Get Avro schema for keys and values
+	foreach my $type (qw/key value/) {
+		($avro_schemas->{$type}->{id}, $avro_schemas->{$type}->{schema}) = $self->_get_avro_schema($params{topic}, $type, $params{"${type}_schema"});
+	}
 
+	if ($params{keys}) {
+		
+		# Return if key Avro schema was not found
+		$self->_set_error('No key Avro schema found')
+			and return undef
+				unless defined $avro_schemas->{key}->{id} && defined $avro_schemas->{key}->{schema};
+				
+		# Avro encoding of messages
+		if (ref($params{keys}) eq 'ARRAY') {
+			$keys = [
+				map {
+					_encode($avro_schemas->{key}, $_);
+				} @{$params{keys}} 
+			];
+		} else {
+			$keys = _encode($avro_schemas->{key}, $params{keys});
+		}
+		
+	}
+
+	# Return if value Avro schema was not found
+	$self->_set_error('No value Avro schema found')
+		and return undef
+			unless defined $avro_schemas->{value}->{id} && defined $avro_schemas->{value}->{schema};
+			
 	# Avro encoding of messages
-	my $messages;
 	if (ref($params{messages}) eq 'ARRAY') {
 		$messages = [
 			map {
@@ -312,7 +349,7 @@ sub send {
 		$params{topic},
 		$params{partition},
 		$messages,
-		$params{keys},
+		$keys,
 		$params{compression_codec}
 	);
 	
