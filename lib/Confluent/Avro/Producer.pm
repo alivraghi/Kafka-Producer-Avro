@@ -98,11 +98,122 @@ sub new {
 	return bless($self, $class);
 }
 
+
+
+##### Class methods
+
+# Encode $payload in Avro format according to an Avro schema 
+sub _encode {
+	my $schema_ref = shift;
+	my $payload = shift;
+	my $encoded = pack('bN', &MAGIC_BYTE, $schema_ref->{id});
+	Avro::BinaryEncoder->encode(
+		schema	=> $schema_ref->{schema},
+		data	=> $payload,
+		emit_cb	=> sub {
+			$encoded .= ${ $_[0] };
+		}
+	);
+	return $encoded;
+}
+
+
 ##### Private methods
 
 sub _clear_error { $_[0]->_set_error() } 
 sub _set_error   { $_[0]->{__ERROR} = $_[1] } 
 sub _get_error   { $_[0]->{__ERROR} }
+
+# Interact with Schema Registry
+sub _get_avro_schema {
+	my $self = shift;
+	my $topic = shift;
+	my $type = shift;
+	my $supplied_schema = shift;
+	
+	my $subject = $topic . '-' . $type;
+	my $sr = $self->schema_registry();
+	my ($schema_id, $avro_schema);
+	
+	# FIXME need to use caching w/ TTL to avoid these checks for every call
+	
+	# If a schema is supplied...	
+	if ($supplied_schema) {
+		
+		# If the subject exixts...
+		my $subjects = $sr->get_subjects();
+		if (grep(/^$subject$/, @$subjects) ) {
+			
+			# ...check if it already exists in registry
+			my $schema_info = $sr->check_schema(
+				SUBJECT => $topic,
+				TYPE => $type,
+				SCHEMA => $supplied_schema 
+			);
+			if ( defined $schema_info ) {
+				
+				$schema_id   = $schema_info->{id};
+				$avro_schema = $schema_info->{schema};
+
+			# ...if it does not already exist in the registry....
+			} else {
+			
+				# ...test new schema compliancy against latest version 
+				my $compliant = $sr->test_schema(
+					SUBJECT => $topic,
+					TYPE => $type,
+					SCHEMA => $supplied_schema
+				);
+				$self->_set_error('Schema not compliant with latest one from registry') &&
+					return undef
+						unless $compliant;
+			
+			}
+			
+		}
+		
+		# ...if a previous id for the schema is not available, try to add the one supplied to the registry....
+		unless ($schema_id) {
+					  
+			# ...procede adding it to the registry
+			$schema_id = $sr->add_schema(
+				SUBJECT => $topic,
+				TYPE => $type,
+				SCHEMA => $supplied_schema
+			);
+			$self->_set_error('Error adding schema to registry: ' . encode_json($sr->get_error())) &&
+				return undef
+					unless $schema_id;
+			
+			# ...and bless new schema into an Avro schema object 
+			$avro_schema = Avro::Schema->parse($supplied_schema);
+			
+		}
+		
+	} else {
+		
+		# retreive latest schema for the topic value
+		my $schema_info = $sr->get_schema(
+			SUBJECT => $topic,
+			TYPE => $type
+		);
+		if ( defined $schema_info ) {
+			
+			$schema_id = $schema_info->{id};
+			$avro_schema = $schema_info->{schema};
+			
+		} else {
+			$self->_set_error("No schema in registry for subject " . $topic . '-' . 'value') &&
+				return undef
+					unless $schema_info;
+		}
+		 
+	}
+	
+	return ($schema_id, $avro_schema);
+}
+
+
 
 
 
@@ -162,104 +273,38 @@ subject (key or value).
 
 =cut
 
+
 sub send {
 	my $self = shift;
 	my %params = @_;
-	my $schema_id;
-	my $avro_schema;
-	my $sr = $self->schema_registry();
-	my $key_subject = $params{topic} . '-key';
-	my $value_subject = $params{topic} . '-value';
+	my $avro_schemas = {
+		key => {
+			id => undef,
+			schema => undef
+		},
+		value => {
+			id => undef,
+			schema => undef
+		}
+	};
 
 	$self->_clear_error();
 	
-	# FIXME need to use caching w/ TTL to avoid these checks for every call
-	
-	# If a schema is supplied...	
-	if ($params{value_schema}) {
-		
-		# If the subject exixts...
-		my $subjects = $sr->get_subjects();
-		if (grep(/^$value_subject$/, @$subjects) ) {
-			
-			# ...check if it already exists in registry
-			my $schema_info = $sr->check_schema(
-				SUBJECT => $params{topic},
-				TYPE => 'value',
-				SCHEMA => $params{value_schema} 
-			);
-			if ( defined $schema_info ) {
-				
-				$schema_id   = $schema_info->{id};
-				$avro_schema = $schema_info->{schema};
-
-			# ...if it does not already exist in the registry....
-			} else {
-			
-				# ...test new schema compliancy against latest version 
-				my $compliant = $sr->test_schema(
-					SUBJECT => $params{topic},
-					TYPE => 'value',
-					SCHEMA => $params{value_schema}
-				);
-				$self->_set_error('Schema not compliant with latest one from registry') &&
-					return undef
-						unless $compliant;
-			
-			}
-			
-		}
-		
-		# ...if a previous id for the schema is not available, try to add the one supplied to the registry....
-		unless ($schema_id) {
-					  
-			# ...procede adding it to the registry
-			$schema_id = $sr->add_schema(
-				SUBJECT => $params{topic},
-				TYPE => 'value',
-				SCHEMA => $params{value_schema}
-			);
-			$self->_set_error('Error adding schema to registry: ' . encode_json($sr->get_error())) &&
-				return undef
-					unless $schema_id;
-			
-			# ...and bless new schema into an Avro schema object 
-			$avro_schema = Avro::Schema->parse($params{value_schema});
-			
-		}
-		
-	} else {
-		
-		# retreive latest schema for the topic value
-		my $schema_info = $sr->get_schema(
-			SUBJECT => $params{topic},
-			TYPE => 'value'
-		);
-		if ( defined $schema_info ) {
-			
-			$schema_id = $schema_info->{id};
-			$avro_schema = $schema_info->{schema};
-			
-		} else {
-			$self->_set_error("No schema in registry for subject " . $params{topic} . '-' . 'value') &&
-				return undef
-					unless $schema_info;
-		}
-		 
-	}
+	# Get Avro schema for values
+	($avro_schemas->{value}->{id}, $avro_schemas->{value}->{schema}) = $self->_get_avro_schema($params{topic}, 'value', $params{value_schema});
+	return undef
+		unless defined $avro_schemas->{value}->{id} && defined $avro_schemas->{value}->{schema};
 
 	# Avro encoding of messages
-	my $messages = [];
-	foreach my $message (@{$params{messages}}) {
-		my $enc = pack('bN', &MAGIC_BYTE, $schema_id);
-		Avro::BinaryEncoder->encode(
-			schema	=> $avro_schema,
-			data	=> $message,
-			emit_cb	=> sub {
-				$enc .= ${ $_[0] };
-			}
-		);
-		push @$messages, $enc;
+	my $messages;
+	if (ref($params{messages}) eq 'ARRAY') {
+		$messages = [
+			map {
+				_encode($avro_schemas->{value}, $_);
+			} @{$params{messages}} 
+		];
+	} else {
+		$messages = _encode($avro_schemas->{value}, $params{messages});
 	}
 	
 	# Send messages through Kafka::Producer parent class
@@ -272,6 +317,7 @@ sub send {
 	);
 	
 }
+
 
 1;
 

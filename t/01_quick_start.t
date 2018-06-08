@@ -28,7 +28,10 @@ isa_ok($cap, $class);
 
 my $topic = 'test-elasticsearch-sink';
 my $partition = 0;
-my $messages = [ { 'f1' => 'name ' . localtime } ];
+my $messages = [ 
+	{ 'f1' => 'foo ' . localtime }, 
+	{ 'f1' => 'bar ' . localtime } 
+];
 my $keys = undef;
 my $compression_codec = undef;
 my $key_schema = undef;
@@ -128,5 +131,17 @@ $res = $cap->send(
 	#value_schema=>$value_schema_bad
 );
 ok(!defined $res, 'No schema in registry: ' . $cap->_get_error());
+
+$res = $cap->send(
+	topic=>$topic, 
+	partition=>$partition, 
+	messages=>$messages->[0], 
+	keys=>$keys, 
+	compressione_codec=>$compression_codec, 
+	key_schema=>$key_schema, 
+	value_schema=>$value_schema
+);
+isa_ok($res, 'HASH', 'Single message sent');
+
 
 $kc->close();

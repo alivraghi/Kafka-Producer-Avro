@@ -7,8 +7,8 @@ elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 	# zookeeper:2181
 	# kafka:9092
 	# schema-registry:8081
-	# kafka-rest:
-	# connect:
+	# kafka-rest:8082
+	# connect:8083
 	# ksql:
 	# control-center:
 	# elasticsearch:9200+9300
@@ -17,47 +17,55 @@ elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 curl -X GET "localhost:9200/_cat/indices?v"
 
 # Load elasticsearch-sink Kafka Connector
-confluent load elasticsearch-sink | json_pp
+confluent load kafka_perl_test-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/kafka_perl_test-elasticsearch-sink.properties 
+# Load jdbc-sink Kafka Connector
+confluent load kafka_perl_test-jdbc-sink -d ~/Confluent-Avro-Producer/resource/kafka_perl_test-sink.properties 
 
-# Retreive again Elasticsearch indexes
-curl -X GET "localhost:9200/_cat/indices?v"
 
 # List Schema Registry subjects
 curl -X GET http://localhost:8081/subjects | json_pp
 
 # Start Kafka Avro console PRODUCER
-kafka-avro-console-producer --broker-list localhost:9092 --topic test-elasticsearch-sink --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"f1","type":"string"}]}'
+kafka-avro-console-producer  --broker-list localhost:9092 --topic kafka_perl_test  --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"id","type":"int"},{"name":"product", "type": "string"}, {"name":"quantity", "type": "int"}, {"name":"price","type": "float"}]}'
 
-# List Schema Registry subjects
-curl -X GET http://localhost:8081/subjects | json_pp
+{"id": 0, "product": "foo", "quantity": 100, "price": 250.65}
+{"id": 1, "product": "bar", "quantity":  50, "price": 0.25}
+{"id": 2, "product": "pir", "quantity": 299, "price": 50.00}
 
-# List "test-elasticsearch-sink-value" subject versions
-curl -X GET http://localhost:8081/subjects/test-elasticsearch-sink-value/versions | json_pp
+# List subject versions
+curl -X GET http://localhost:8081/subjects/kafka_perl_test-value/versions | json_pp
 
 # Start Kafka Avro console CONSUMER
-kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic test-elasticsearch-sink
+kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic kafka_perl_test
 
-# Read Elasticsearch "test-elasticsearch-sink" index
-curl -X GET "localhost:9200/test-elasticsearch-sink/_search?pretty"
+# Read from Elasticsearch index
+curl -X GET "localhost:9200/kafka_perl_test/_search?pretty"
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-# Delete subject "test-elasticsearch-sink"
-curl -X DELETE http://localhost:8081/subjects/test-elasticsearch-sink-value?pretty
+# Delete subject from Schema Registry
+curl -X DELETE http://localhost:8081/subjects/kafka_perl_test-value | json_pp
 
-# Delete Elasticsearch "test-elasticsearch-sink" index
-curl -X DELETE "localhost:9200/test-elasticsearch-sink?pretty"
+# Delete Elasticsearch index
+curl -X DELETE "localhost:9200/kafka_perl_test?pretty"
+
+# Drop oracle table
+oracle_query remote_activity/remote_activity@artbase "drop table kafka;"
 
 # Kafka topics data directory (if needed)
 cd $(cat /tmp/confluent.current)/kafka/data/
 
-# Empty "test-elasticsearch-sink" topic 
-kafka-topics --zookeeper localhost:2181 --delete --topic test-elasticsearch-sink
+# Delete topic 
+kafka-topics --zookeeper localhost:2181 --delete --topic kafka_perl_test
 
-# Unload elasticsearch-sink Kafka Connector
-confluent unload elasticsearch-sink
+# Unload Connectors
+confluent unload kafka_perl_test-jdbc-sink 
+confluent unload kafka_perl_test-elasticsearch-sink
+
+# Delete topic
+kafka-topics --zookeeper localhost:2181 --delete --topic kafka_perl_test
 
 # Stop Confluent DEV environment
 confluent stop
