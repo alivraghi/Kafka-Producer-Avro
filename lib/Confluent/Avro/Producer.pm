@@ -343,6 +343,16 @@ sub send {
 	} else {
 		$messages = _encode($avro_schemas->{value}, $params{messages});
 	}
+			
+	# Return in case of mismatch between keys and messages
+	if ($avro_schemas->{key}->{id}) {
+		$self->_set_error('Keys/messages format mismatch')
+			and return undef
+				if ref($keys) eq 'ARRAY' && ref($messages) ne 'ARRAY';
+		$self->_set_error('Keys/messages count mismatch')
+			and return undef
+				if ref($keys) eq 'ARRAY' && ref($messages) eq 'ARRAY' && $#$keys != $#$messages;
+	}
 	
 	# Send messages through Kafka::Producer parent class
 	return $self->SUPER::send(

@@ -16,6 +16,10 @@ use Test::More qw( no_plan );
 
 BEGIN { use_ok('Confluent::Avro::Producer', qq/Using/); }
 
+sub _nvl_str {
+	return defined $_[0] ? $_[0] : ''; 
+}
+
 my $class = 'Confluent::Avro::Producer';
 
 my $kc = new_ok('Kafka::Connection' => [ 'host','localhost' ]);
@@ -32,9 +36,17 @@ my $messages = [
 	{ 'f1' => 'foo ' . localtime }, 
 	{ 'f1' => 'bar ' . localtime } 
 ];
-my $keys = undef;
+my $keys = [
+	1,
+	2
+];
 my $compression_codec = undef;
-my $key_schema = undef;
+my $key_schema = <<KEY_SCHEMA;
+{
+	"type": "long",
+	"name": "_id"
+}
+KEY_SCHEMA
 my $value_schema = <<VALUE_SCHEMA;
 {
 	"type": "record",
@@ -59,7 +71,7 @@ my $value_schema_bad = <<VALUE_SCHEMA;
 	"name": "myrecord"
 }
 VALUE_SCHEMA
-my $unwanted_param = 0;
+my $unexpected_param = 0;
 my $res;
 
 # Clear Schema Registry subjects used for testing
@@ -75,7 +87,7 @@ $res = $cap->send(
 	key_schema=>$key_schema, 
 	value_schema=>$value_schema_bad
 );
-ok(!defined $res, 'No schema in registry and bad schema supplied: ' . $cap->_get_error());
+ok(!defined $res, 'No schema in registry and bad schema supplied: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic, 
@@ -85,9 +97,9 @@ $res = $cap->send(
 	compressione_codec=>$compression_codec, 
 	key_schema=>$key_schema, 
 	value_schema=>$value_schema, 
-	unwanted_param=>$unwanted_param
+	unexpected_param=>$unexpected_param
 );
-isa_ok($res, 'HASH', 'Message(s) sent with new value schema: ' . $cap->_get_error());
+isa_ok($res, 'HASH', 'Message(s) sent with new value schema: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic, 
@@ -97,7 +109,7 @@ $res = $cap->send(
 	compressione_codec=>$compression_codec, 
 	key_schema=>$key_schema
 );
-isa_ok($res, 'HASH', 'Message(s) sent by retreiving schema from registry: ' . $cap->_get_error());
+isa_ok($res, 'HASH', 'Message(s) sent by retreiving schema from registry: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic, 
@@ -108,7 +120,7 @@ $res = $cap->send(
 	key_schema=>$key_schema, 
 	value_schema=>$value_schema_not_compliant
 );
-ok(!defined $res, 'Incompatible schema: ' . $cap->_get_error());
+ok(!defined $res, 'Incompatible schema: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic, 
@@ -119,7 +131,7 @@ $res = $cap->send(
 	key_schema=>$key_schema, 
 	value_schema=>$value_schema_bad
 );
-ok(!defined $res, 'Invalid schema: ' . $cap->_get_error());
+ok(!defined $res, 'Invalid schema: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic.'BAD', 
@@ -130,13 +142,13 @@ $res = $cap->send(
 	key_schema=>$key_schema, 
 	#value_schema=>$value_schema_bad
 );
-ok(!defined $res, 'No schema in registry: ' . $cap->_get_error());
+ok(!defined $res, 'No schema in registry: ' . _nvl_str($cap->_get_error()));
 
 $res = $cap->send(
 	topic=>$topic, 
 	partition=>$partition, 
 	messages=>$messages->[0], 
-	keys=>$keys, 
+	keys=>$keys->[0], 
 	compressione_codec=>$compression_codec, 
 	key_schema=>$key_schema, 
 	value_schema=>$value_schema
