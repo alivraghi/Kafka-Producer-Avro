@@ -37,12 +37,12 @@ use 5.010;
 use strict;
 use warnings;
 
-use JSON;
+use JSON::XS;
 
 use Data::Dumper;
-$Data::Dumper::Purity = 1;
-$Data::Dumper::Terse = 1;
-$Data::Dumper::Useqq = 1;
+#$Data::Dumper::Purity = 1;
+#$Data::Dumper::Terse = 1;
+#$Data::Dumper::Useqq = 1;
 
 use base 'Kafka::Producer';
 
@@ -108,11 +108,14 @@ sub _encode {
 	my $payload = shift;
 	return undef
 		unless defined $payload;
+#	print Dumper($payload->{id});
+#	print encode_json($payload), "\n";
 	my $encoded = pack('bN', &MAGIC_BYTE, $schema_ref->{id});
 	Avro::BinaryEncoder->encode(
 		schema	=> $schema_ref->{schema},
 		data	=> $payload,
 		emit_cb	=> sub {
+			#print STDERR Dumper(\@_);
 			$encoded .= ${ $_[0] };
 		}
 	);
