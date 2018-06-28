@@ -3,11 +3,12 @@
 use strict;
 use warnings;
 use Data::Dumper;
-#$Data::Dumper::Purity = 1;
-#$Data::Dumper::Terse = 1;
-#$Data::Dumper::Useqq = 1;
+$Data::Dumper::Purity = 1;
+$Data::Dumper::Terse = 1;
+$Data::Dumper::Useqq = 1;
 
 use Try::Tiny;
+use DateTime;
 
 use Confluent::SchemaRegistry;
 use Confluent::Avro::Producer;
@@ -73,8 +74,38 @@ my $art = API::ART->new(ARTID => $artid, USER => $artuser, PASSWORD => $artpwd);
 # Create collection
 my $ac = API::ART::Collection::Activity->new(ART => $art);
 
+
+#2017-07-19T12:36:14.000000000+02:00
+#^(\d{4})\-(\d{2})\-(\d{2})T(\d\d):(\d\d):(\d\d)\.(\d{9})(.*)$
+
+my $isodate_to_epoch = sub {
+	my $isodate = shift;
+	print $isodate, ' ==> ';
+	$isodate =~ m/^(\d{4})\-(\d{2})\-(\d{2})T(\d\d):(\d\d):(\d\d)\.(\d{9})(.*)$/;
+	my $dt = DateTime->new(
+		 year       => $1
+		,month      => $2
+		,day        => $3
+		,hour       => $4
+		,minute     => $5
+		,second     => $6
+		,nanosecond => $7
+		,time_zone  => $8
+	);
+	print $dt->epoch(), ' ==> ';
+	my $dt1 = DateTime->from_epoch(epoch => $dt->epoch());
+	$dt1->set_time_zone('Europe/Rome');
+	print $dt1->strftime("%FT%T.%6N%z"), "\n";
+	return $dt->epoch();
+};
+
 # Find activities
 my $acts = [
+#	map {
+#		print $_->{id}, ': ';
+#		$_->{info}->{creationDate} = $isodate_to_epoch->($_->{info}->{creationDate});
+#		$_;
+#	}
 	map { 
 		$_->dump( SYSTEM=>{EXCLUDE_ALL=>1} ) # dump activity as a Perl structure 
 	}
@@ -110,10 +141,13 @@ elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 	# elasticsearch:9200+9300
 
 # Load ES connector
-confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
+sleep 5 && confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
 
 # Produce messages by API::ART
-perl tmp/test.pl resource/api-art-activity.work.avsc
+perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_CORE_ART root pippo123 WPSOCORE
+perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_AP_ART root pippo123 WPSOAP
+perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_WORKS_ART root pippo123 WPSOWORKS
+
 
 # Consume messages using console Avro utility
 kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic api-art-activity
@@ -168,8 +202,9 @@ for (my $i=1; $i<=$message_count; $i+=$bulk_size) {
 		key_schema			=> $schema_key,
 		value_schema		=> $schema_value
 	);
-	die "Unable to send messages: " . Dumper($sr->get_error())
-		unless defined $res;
+	print "Unable to send message(s): " . Dumper($cap->get_error())
+		and exit(1)
+			unless defined $res;
 	$sent += scalar(@messages);
 	print "done\n";
 }
