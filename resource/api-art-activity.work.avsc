@@ -1,20 +1,122 @@
 {
-	"namespace": "net.ict.sirti.restart",
+	"namespace": "net.sirti.ict.art.api",
 	"name": "activity",
 	"doc": "API::ART::Activity schema",
 	"type": "record",
 	"fields": [
 		{
 			"name": "id",
-			"doc": "Identificativo univoco",
+			"doc": "Identificativo univoco attività",
 			"type": "long"
+		},
+		{
+			"name": "system",
+			"doc": "Identificativo univoco sistema",
+			"type": {
+				"type": "record",
+				"name": "systemRecord",
+				"fields": [
+					{
+						"name": "id",
+						"doc": "Identificativo univoco sistema",
+						"type": "long"
+					},
+					{
+						"name": "info",
+						"doc": "Informazioni riepilogative sistema",
+						"type": {
+							"type": "record",
+							"name": "systemInfo",
+							"fields": [
+								{
+									"name": "description",
+									"doc": "Descrizione sistema",
+									"type": "string"
+								},
+								{
+									"name": "type",
+									"doc": "Tipologia sistema",
+									"type": "string"
+								},
+								{
+									"name": "active",
+									"doc": "Indica se il sistema è attivo (!disabled && !ended)",
+									"type": "boolean"
+								},
+								{
+									"name": "disabled",
+									"doc": "Indica se il sistema è disabilitato/sospeso",
+									"type": "boolean"
+								},
+								{
+									"name": "ended",
+									"doc": "Indica se il sistema è dismesso",
+									"type": "boolean"
+								},
+								{
+									"name": "creationDate",
+									"doc": "Data creazione sistema",
+									"type": "string"
+								},
+								{
+									"name": "disablingDate",
+									"doc": "Data di disabilitazione/sospensione sistema",
+									"type": [
+										"null",
+										"string"
+									]
+								},
+								{
+									"name": "endingDate",
+									"doc": "Data di dismissione sistema",
+									"type": [
+										"null",
+										"string"
+									]
+								},
+								{
+									"name": "properties",
+									"doc": "Elenco system-property configurabili",
+									"type": {
+										"type": "array",
+										"items": "string"
+									}
+								},
+								{
+									"name": "groups",
+									"doc": "Elenco gruppi abilitati",
+									"type": {
+										"type": "array",
+										"items": "string"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "properties",
+						"doc": "Oggetto key-value in cui 'key' è il nome della system-property e 'value' è un valore di tipo string",
+						"type": {
+							"type": "map",
+							"values": [
+								"null",
+								"string",
+								{
+									"type": "array",
+									"items": ["null", "string"]
+								}
+							]
+						}
+					}
+				]
+			}
 		},
 		{
 			"name": "info",
 			"doc": "Informazioni riepilogative",
 			"type": {
 				"type": "record",
-				"name": "activityinfo",
+				"name": "activityInfo",
 				"fields": [
 					{
 						"name": "description",
@@ -299,7 +401,7 @@
 		},
 		{
 			"name": "properties",
-			"doc": "Oggetto key-value in cui 'key' è il nome della property e 'value' è un valore di tipo string",
+			"doc": "Oggetto key-value in cui 'key' è il nome della activity-property e 'value' è un valore di tipo string",
 			"type": {
 				"type": "map",
 				"values": [

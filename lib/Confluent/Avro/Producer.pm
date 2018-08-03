@@ -43,6 +43,7 @@ use Data::Dumper;
 #$Data::Dumper::Purity = 1;
 #$Data::Dumper::Terse = 1;
 #$Data::Dumper::Useqq = 1;
+use Try::Tiny;
 
 use base 'Kafka::Producer';
 
@@ -318,7 +319,7 @@ sub send {
 			and return undef
 				unless defined $avro_schemas->{key}->{id} && defined $avro_schemas->{key}->{schema};
 				
-		# Avro encoding of messages
+		# Avro encoding of keys
 		if (ref($params{keys}) eq 'ARRAY') {
 			$keys = [
 				map {
@@ -359,12 +360,110 @@ sub send {
 	
 	# Send messages through Kafka::Producer parent class
 	return $self->SUPER::send(
-		$params{topic},
+		$params{topic}, 
 		$params{partition},
 		$messages,
 		$keys,
 		$params{compression_codec}
 	);
+	
+}
+
+
+
+sub bulk_send {
+	my $self = shift;
+	my %params = @_;
+	
+	$self->_clear_error();
+	
+	# If there is no an array of messages use send()
+	return $self->send(%params)
+		unless ref($params{messages}) eq 'ARRAY';
+	
+	$self->_set_error('Missing bulk size')
+		and return undef
+			unless defined $params{size};
+	$self->_set_error('Bad bulk size')
+		and return undef
+			unless $params{size} =~ /^\d+$/;
+
+	my $messages = $params{messages};
+	my $keys = $params{keys};
+	$self->_set_error('Keys/messages format mismatch')
+		and return undef
+			if ref($keys) eq 'ARRAY' && ref($messages) ne 'ARRAY';
+	$self->_set_error('Keys/messages count mismatch')
+		and return undef
+			if ref($keys) eq 'ARRAY' && ref($messages) eq 'ARRAY' && $#$keys != $#$messages;
+	
+	my @messages = @$messages;		# duplicate messages array to preserve external array
+	# Check for key(s) format (ARRAY vs. SCALAR)
+	my (@keys, $key);
+	if (ref($params{keys}) eq 'ARRAY') {
+		@keys = @$keys;
+	} else {
+		$key = $keys;
+	}
+	my $message_count = scalar(@messages);
+	my $bulk_size = $params{size};
+	my $sent = 0;
+	my $errors = 0;
+	my $bulk_num = 0;
+	
+	if (ref($params{on_init}) eq 'CODE') {
+		# SCALAR $to_send, SCALAR $bulk_size
+		$params{on_init}->($message_count, $bulk_size);
+	}
+	for (my $i=1; $i<=$message_count; $i+=$bulk_size) {
+		$bulk_num++;
+		my @bulk = splice @messages, 0, $bulk_size;
+		my $bulk_keys = $key;
+		unless ($bulk_keys) {
+			$bulk_keys = [ splice(@keys, 0, $bulk_size) ];
+		}
+		if (ref($params{on_before_send_bulk}) eq 'CODE') {
+			# SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
+			$params{on_before_send_bulk}->($bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
+		}
+#		try {
+			my $res = $self->send(
+				'topic'					=> $params{topic}, 
+				'partition'				=> 0, 
+				'messages'				=> [ @bulk ], 
+				'keys'					=> $bulk_keys,
+				'compressione_codec'	=> undef,
+				'key_schema'			=> $params{key_schema},
+				'value_schema'			=> $params{value_schema}
+			);
+			if (defined $res) {
+				$sent += scalar(@bulk);
+				if (ref($params{on_after_send_bulk}) eq 'CODE') {
+					# SCALAR $bulk_num, SCALAR $sent, SCALAR $total_sent
+					$params{on_after_send_bulk}->(scalar(@bulk), $sent);
+				}
+			} else {
+				$errors++;
+				if (ref($params{on_send_error}) eq 'CODE') {
+					# OBJECT $error, SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
+					$params{on_send_error}->($self->get_error(), $bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
+				}
+			}
+#		} catch {
+#			$self->_set_error('Unable to send message(s): ' . $_);
+#			$errors++;
+#			if (ref($params{on_send_error}) eq 'CODE') {
+#				# OBJECT $error, SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
+#				$params{on_send_error}->($self->get_error(), $bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
+#			}
+#			return undef;
+#		}
+	}
+	if (ref($params{on_complete}) eq 'CODE') {
+		# SCALAR $total_sent, SCALAR $errors
+		$params{on_complete}->($message_count, $sent, $errors);
+	}
+	return $sent;
 	
 }
 

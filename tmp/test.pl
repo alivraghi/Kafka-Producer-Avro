@@ -6,19 +6,28 @@ use Data::Dumper;
 $Data::Dumper::Purity = 1;
 $Data::Dumper::Terse = 1;
 $Data::Dumper::Useqq = 1;
+use JSON;
 
 use Try::Tiny;
 use DateTime;
 
+use Kafka qw(
+    $KAFKA_SERVER_PORT
+    $REQUEST_TIMEOUT
+    $RECEIVE_EARLIEST_OFFSET
+    $DEFAULT_MAX_NUMBER_OF_OFFSETS
+    $DEFAULT_MAX_BYTES
+);
+use Kafka::Connection;
 use Confluent::SchemaRegistry;
 use Confluent::Avro::Producer;
 #use Avro::Schema;
 use API::ART;
 use API::ART::Collection::Activity;
 
-die "Usage: $0 avro_schema_file topic artid artuser artpwd [key_prefix]"
+die "Usage: $0 avro_schema_file topic artid artuser artpwd activity_type [key_prefix]"
 	if scalar(@ARGV) < 5;
-my ($schema_value_file, $topic, $artid, $artuser, $artpwd, $key_prefix) = @ARGV;
+my ($schema_value_file, $topic, $artid, $artuser, $artpwd, $at, $key_prefix) = @ARGV;
 $key_prefix = $key_prefix || '';
 
 # Read schema for message keys
@@ -57,7 +66,7 @@ my $cap = Confluent::Avro::Producer->new(
 #};
 #print STDERR 'Avro::Schema: ', Dumper($xxx);
 
-#my $schema_value_id = $sr->add_schema(SUBJECT => $topic, TYPE => $type, SCHEMA => $schema_value);
+#my $schema_value_id = $sr->add_schema(SUBJECT => $topic, TYPE => 'value', SCHEMA => $schema_value);
 #die 'Bad schema: ' . Dumper($sr->get_error()) . "\n"
 #	unless defined $schema_value_id;
 #print 'Schema Id: ', $schema_value_id, "\n";
@@ -71,33 +80,38 @@ my $cap = Confluent::Avro::Producer->new(
 # Connect to ART
 my $art = API::ART->new(ARTID => $artid, USER => $artuser, PASSWORD => $artpwd);
 
+#print STDERR 'activity types: ', Dumper($art->enum_activity_type()), "\n";
+#exit;
+
 # Create collection
 my $ac = API::ART::Collection::Activity->new(ART => $art);
 
 
-#2017-07-19T12:36:14.000000000+02:00
-#^(\d{4})\-(\d{2})\-(\d{2})T(\d\d):(\d\d):(\d\d)\.(\d{9})(.*)$
+#foreach my $key (keys %{$art->enum_activity_type()}) {
+#	print STDERR $key, "\n";
+#}
+#exit;
 
-my $isodate_to_epoch = sub {
-	my $isodate = shift;
-	print $isodate, ' ==> ';
-	$isodate =~ m/^(\d{4})\-(\d{2})\-(\d{2})T(\d\d):(\d\d):(\d\d)\.(\d{9})(.*)$/;
-	my $dt = DateTime->new(
-		 year       => $1
-		,month      => $2
-		,day        => $3
-		,hour       => $4
-		,minute     => $5
-		,second     => $6
-		,nanosecond => $7
-		,time_zone  => $8
-	);
-	print $dt->epoch(), ' ==> ';
-	my $dt1 = DateTime->from_epoch(epoch => $dt->epoch());
-	$dt1->set_time_zone('Europe/Rome');
-	print $dt1->strftime("%FT%T.%6N%z"), "\n";
-	return $dt->epoch();
-};
+#my $isodate_to_epoch = sub {
+#	my $isodate = shift;
+#	print $isodate, ' ==> ';
+#	$isodate =~ m/^(\d{4})\-(\d{2})\-(\d{2})T(\d\d):(\d\d):(\d\d)\.(\d{9})(.*)$/;
+#	my $dt = DateTime->new(
+#		 year       => $1
+#		,month      => $2
+#		,day        => $3
+#		,hour       => $4
+#		,minute     => $5
+#		,second     => $6
+#		,nanosecond => $7
+#		,time_zone  => $8
+#	);
+#	print $dt->epoch(), ' ==> ';
+#	my $dt1 = DateTime->from_epoch(epoch => $dt->epoch());
+#	$dt1->set_time_zone('Europe/Rome');
+#	print $dt1->strftime("%FT%T.%6N%z"), "\n";
+#	return $dt->epoch();
+#};
 
 # Find activities
 my $acts = [
@@ -107,10 +121,15 @@ my $acts = [
 #		$_;
 #	}
 	map { 
-		$_->dump( SYSTEM=>{EXCLUDE_ALL=>1} ) # dump activity as a Perl structure 
+		my $x = $_->dump( 
+			#SYSTEM=>{ EXCLUDE_ALL=>1 } 
+		); # dump activity as a Perl structure
+		print STDERR to_json($x), "\n";
+		$x;
 	}
 	@{
 		$ac->find_object(
+			ACTIVITY_TYPE_NAME_IN => [ $at ] 
 			#LIMIT	=> 10,
 			#ID_IN	=> [ 5987, 5988 ]
 			#ACTIVE	=> -1
@@ -122,60 +141,6 @@ die 'No matches found!'
 	unless scalar @$acts;
 print "Found: ", scalar @$acts, "\n";
 
-
-=pod
-
-# Start Confluent environment
-confluent start
-
-# Start ElasticSearch
-elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
-
-	# zookeeper:2181
-	# kafka:9092
-	# schema-registry:8081
-	# kafka-rest:8082
-	# connect:8083
-	# ksql:
-	# control-center:
-	# elasticsearch:9200+9300
-
-# Load ES connector
-sleep 5 && confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
-
-# Produce messages by API::ART
-perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_CORE_ART root pippo123 WPSOCORE
-perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_AP_ART root pippo123 WPSOAP
-perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_WORKS_ART root pippo123 WPSOWORKS
-
-
-# Consume messages using console Avro utility
-kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic api-art-activity
-
-# Search in ES index
-curl -X GET "localhost:9200/api-art-activity/_search?q=pippo&pretty"
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-# Delete Schema Registry subject 
-curl -X DELETE http://localhost:8081/subjects/api-art-activity-value | json_pp
-
-# Delete ES index
-curl -X DELETE "localhost:9200/api-art-activity?pretty"
-
-# Delete Kafka topic
-kafka-topics --zookeeper localhost:2181 --delete --topic api-art-activity
-
-# Unload connectort
-confluent unload api-art-activity-elasticsearch-sink
-
-# Stop Confluent environment
-confluent stop
-
-# Stop ES
-kill $(cat /tmp/.elasticsearch.pid)
-
-=cut
 
 my $message_count = scalar(@$acts); 
 my $bulk_size = 500;
@@ -191,10 +156,8 @@ for (my $i=1; $i<=$message_count; $i+=$bulk_size) {
 		], 
 		keys				=> [
 			map { 
-				  $key_prefix				# FIXME better using ES type: now it's defined in connector's "type.name" config 
+				  $key_prefix				#  
 				. ($key_prefix ? '-' : '')
-				. 'A-'						# stands for Activity; for systems will be 'S'
-				. $_->{info}->{type} . '-'	# concatenate with Activity Type name 
 				. $_->{id}					# finally use activity id
 			} @messages 
 		],

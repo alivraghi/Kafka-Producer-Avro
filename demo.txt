@@ -1,6 +1,3 @@
-# Start Confluent DEV environment
-confluent start
-
 # Start ElasticSearch
 elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 
@@ -13,63 +10,74 @@ elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 	# control-center:
 	# elasticsearch:9200+9300
 
-# Retreive Elasticsearch indexes
-curl -X GET "localhost:9200/_cat/indices?v"
+# Start Confluent environment
+confluent start
 
-# Load elasticsearch-sink Kafka Connector
-confluent load kafka_perl_test-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/kafka_perl_test-elasticsearch-sink.properties 
-# Load jdbc-sink Kafka Connector
-confluent load kafka_perl_test-jdbc-sink -d ~/Confluent-Avro-Producer/resource/kafka_perl_test-sink.properties 
+# Load ES connector
+sleep 10 
+#confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
+confluent load wpretelit-activity-wo-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-wo-sink.properties
+confluent load wpretelit-activity-tt-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-tt-sink.properties
+confluent load wphdtfo-activity-tt-sink   -d ~/Confluent-Avro-Producer/resource/wphdtfo-activity-tt-sink.properties
 
-
-# List Schema Registry subjects
-curl -X GET http://localhost:8081/subjects | json_pp
-
-# Start Kafka Avro console PRODUCER
-kafka-avro-console-producer  --broker-list localhost:9092 --topic kafka_perl_test  --property value.schema='{"type":"record","name":"myrecord","fields":[{"name":"id","type":"int"},{"name":"product", "type": "string"}, {"name":"quantity", "type": "int"}, {"name":"price","type": "float"}]}'
-
-{"id": 0, "product": "foo", "quantity": 100, "price": 250.65}
-{"id": 1, "product": "bar", "quantity":  50, "price": 0.25}
-{"id": 2, "product": "pir", "quantity": 299, "price": 50.00}
-
-# List subject versions
-curl -X GET http://localhost:8081/subjects/kafka_perl_test-value/versions | json_pp
-
-# Start Kafka Avro console CONSUMER
-kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic kafka_perl_test
-
-# Read from Elasticsearch index
-curl -X GET "localhost:9200/kafka_perl_test/_search?pretty"
+# Produce messages by API::ART
+#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_CORE_ART root pippo123 WPSOCORE
+#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_AP_ART root pippo123 WPSOAP
+#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_WORKS_ART root pippo123 WPSOWORKS
+perl tmp/api-art-producer.pl wpretelit SIRTI_RETELIT root pippo123
+perl tmp/api-art-producer.pl wphdtfo SIRTI_HDTFO root pippo123
+perl tmp/api-art-producer.pl soadvlog SIRTI_SOADVLOG root pippo123
+perl tmp/api-art-producer.pl wpsoap SIRTI_WPSO_AP_ART root pippo123
+perl tmp/api-art-producer.pl wpsocore SIRTI_WPSO_CORE_ART root pippo123
+perl tmp/api-art-producer.pl wpsoap SIRTI_WPSO_AP_ART root pippo123
+perl tmp/api-art-producer.pl wpsoworks SIRTI_WPSO_WORKS_ART root pippo123
 
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Consume messages using console Avro utility
+#kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic api-art-activity
+kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic wpretelit-activity-wo
+kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic wpretelit-activity-tt
+kafka-avro-console-consumer --bootstrap-server=localhost:9092 --from-beginning --topic wphdtfo-activity-tt
+
+# Search in ES index
+#curl -X GET "localhost:9200/api-art-activity/_search?q=pippo&pretty"
+curl -X GET "localhost:9200/wpretelit-activity-wo/_search?q=pippo&pretty"
+curl -X GET "localhost:9200/wpretelit-activity-tt/_search?q=pippo&pretty"
+curl -X GET "localhost:9200/wphdtfo-activity-tt/_search?q=pippo&pretty"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# Delete Schema Registry subject 
+#curl -X DELETE http://localhost:8081/subjects/api-art-activity-value | json_pp
+curl -X DELETE http://localhost:8081/subjects/wpretelit-activity-wo-value | json_pp
+curl -X DELETE http://localhost:8081/subjects/wpretelit-activity-tt-value | json_pp
+curl -X DELETE http://localhost:8081/subjects/wphdtfo-activity-tt-value   | json_pp
+
+# Delete **ALL** Schema registry subjects at once!!
+curl -X GET http://localhost:8081/subjects/ -s | json_pp | perl -ne 'chomp; s/[\[\]]//g; s/"\,?//g; s/^\s*//g; print; print "\n"' | grep '^\w' | while read idx; do echo -n "$idx: "; curl -X DELETE http://localhost:8081/subjects/$idx -s | json_pp; done
 
 
-# Delete subject from Schema Registry
-curl -X DELETE http://localhost:8081/subjects/kafka_perl_test-value | json_pp
+# Delete ES index
+#curl -X DELETE "localhost:9200/api-art-activity?pretty"
+curl -X DELETE "localhost:9200/wpretelit-activity-wo?pretty"
+curl -X DELETE "localhost:9200/wpretelit-activity-tt?pretty"
+curl -X DELETE "localhost:9200/wphdtfo-activity-tt?pretty"
 
-# Delete Elasticsearch index
-curl -X DELETE "localhost:9200/kafka_perl_test?pretty"
+# Delete Kafka topic
+#kafka-topics --zookeeper localhost:2181 --delete --topic api-art-activity
+kafka-topics --zookeeper localhost:2181 --delete --topic wpretelit-activity-wo
+kafka-topics --zookeeper localhost:2181 --delete --topic wpretelit-activity-tt
+kafka-topics --zookeeper localhost:2181 --delete --topic wphdtfo-activity-tt
 
-# Drop oracle table
-oracle_query remote_activity/remote_activity@artbase "drop table kafka;"
+# Unload connectort
+#confluent unload api-art-activity-elasticsearch-sink
+confluent unload wpretelit-activity-wo-sink
+confluent unload wpretelit-activity-tt-sink
+confluent unload wphdtfo-activity-tt-sink
 
-# Kafka topics data directory (if needed)
-cd $(cat /tmp/confluent.current)/kafka/data/
-
-# Delete topic 
-kafka-topics --zookeeper localhost:2181 --delete --topic kafka_perl_test
-
-# Unload Connectors
-confluent unload kafka_perl_test-jdbc-sink 
-confluent unload kafka_perl_test-elasticsearch-sink
-
-# Delete topic
-kafka-topics --zookeeper localhost:2181 --delete --topic kafka_perl_test
-
-# Stop Confluent DEV environment
+# Stop Confluent environment
 confluent stop
 
-# Stop Elasticsearch
+# Stop ES
 kill $(cat /tmp/.elasticsearch.pid)
 
