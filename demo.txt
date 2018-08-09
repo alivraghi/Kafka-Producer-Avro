@@ -1,33 +1,70 @@
+// https://www.elastic.co/guide/en/elasticsearch/reference/6.3/query-dsl-bool-query.html
+GET /api-art-activity-wpretelit-tt_client/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+              "info.description": {
+              "query": "esagerata anomalia",
+              "operator": "and"
+            }
+          }
+        }
+      ],
+      "filter": {
+        "terms": {
+          "system.info.groups.keyword": ["PIPPO","C_GSD_USER"]
+        }
+      }
+    }
+  },
+  "_source": ["id", "info.description", "system.info.groups"]
+}
+
+
+
+
 # Start ElasticSearch
 elasticsearch --daemonize --pidfile=/tmp/.elasticsearch.pid
 
-	# zookeeper:2181
-	# kafka:9092
-	# schema-registry:8081
-	# kafka-rest:8082
-	# connect:8083
+	# zookeeper .........: 2181
+	# kafka .............: 9092
+	# schema-registry ...: 8081
+	# kafka-rest ........: 8082
+	# connect ...........: 8083
 	# ksql:
-	# control-center:
-	# elasticsearch:9200+9300
+	# control-center ....: 9021
+	
+	# elasticsearch .....: 9200+9300
+	# kibana ............: 5601
 
 # Start Confluent environment
 confluent start
 
-# Load ES connector
-sleep 10 
-#confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
-confluent load wpretelit-activity-wo-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-wo-sink.properties
-confluent load wpretelit-activity-tt-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-tt-sink.properties
-confluent load wphdtfo-activity-tt-sink   -d ~/Confluent-Avro-Producer/resource/wphdtfo-activity-tt-sink.properties
+# Generate Kafka connector properties files
+escu=http://localhost:9200 
+perl tmp/api-art-gen-connectors.pl ${escu} soadvlog SIRTI_SOADVLOG root pippo123 conf
+perl tmp/api-art-gen-connectors.pl ${escu} wpretelit SIRTI_RETELIT root pippo123 conf 
+perl tmp/api-art-gen-connectors.pl ${escu} wphdtfo SIRTI_HDTFO root pippo123 conf
+perl tmp/api-art-gen-connectors.pl ${escu} wpsocore SIRTI_WPSO_CORE_ART root pippo123 conf
+perl tmp/api-art-gen-connectors.pl ${escu} wpsoap SIRTI_WPSO_AP_ART root pippo123 conf
+perl tmp/api-art-gen-connectors.pl ${escu} wpsoworks SIRTI_WPSO_WORKS_ART root pippo123 conf
+unset escu
+
+
+## Load ES connector
+#sleep 10 
+##confluent load api-art-activity-elasticsearch-sink -d ~/Confluent-Avro-Producer/resource/api-art-activity-elasticsearch-sink.properties
+#confluent load wpretelit-activity-wo-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-wo-sink.properties
+#confluent load wpretelit-activity-tt-sink -d ~/Confluent-Avro-Producer/resource/wpretelit-activity-tt-sink.properties
+#confluent load wphdtfo-activity-tt-sink   -d ~/Confluent-Avro-Producer/resource/wphdtfo-activity-tt-sink.properties
 
 # Produce messages by API::ART
-#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_CORE_ART root pippo123 WPSOCORE
-#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_AP_ART root pippo123 WPSOAP
-#perl tmp/test.pl resource/api-art-activity.work.avsc api-art-activity SIRTI_WPSO_WORKS_ART root pippo123 WPSOWORKS
+perl tmp/api-art-producer.pl soadvlog SIRTI_SOADVLOG root pippo123
 perl tmp/api-art-producer.pl wpretelit SIRTI_RETELIT root pippo123
 perl tmp/api-art-producer.pl wphdtfo SIRTI_HDTFO root pippo123
-perl tmp/api-art-producer.pl soadvlog SIRTI_SOADVLOG root pippo123
-perl tmp/api-art-producer.pl wpsoap SIRTI_WPSO_AP_ART root pippo123
 perl tmp/api-art-producer.pl wpsocore SIRTI_WPSO_CORE_ART root pippo123
 perl tmp/api-art-producer.pl wpsoap SIRTI_WPSO_AP_ART root pippo123
 perl tmp/api-art-producer.pl wpsoworks SIRTI_WPSO_WORKS_ART root pippo123

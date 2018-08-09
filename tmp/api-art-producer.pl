@@ -29,11 +29,11 @@ use API::ART::Collection::Activity;
 
 $| = 1;
 
-die "Usage: $0 instance_name artid artuser artpwd [schema_value_file]"
+die "Usage: $0 instance_id artid artuser artpwd [schema_value_file]"
 	if scalar(@ARGV) < 4;
-my ($instance_name, $artid, $artuser, $artpwd, $value_schema_file) = @ARGV;
+my ($instance_id, $artid, $artuser, $artpwd, $value_schema_file) = @ARGV;
 $value_schema_file = 'resource/api-art-activity.work.avsc' unless $value_schema_file;
-my $topic_prefix = 'api-art-activity-' . $instance_name . '-';
+my $topic_prefix = 'api-art-activity-' . $instance_id . '-';
 
 # Read schema for message keys
 my $key_schema = <<KEY_SCHEMA;
@@ -71,7 +71,7 @@ my $ac = API::ART::Collection::Activity->new(ART => $art);
 
 
 foreach my $at (sort keys %{$art->enum_activity_type()}) {
-	next if grep /^$at$/, qw/API::TEST::01 API::TEST::02 API::TEST::03 TMP1 TMP2 KARTATT/;
+	next if grep /^$at$/, qw/API::TEST::01 API::TEST::02 API::TEST::03 TMP1 TMP2 KARTATT KART_HISTORY/;
 	print 'Activity Type ', $at, ': ';
 	# Find activities
 	my $acts = [
@@ -99,7 +99,7 @@ foreach my $at (sort keys %{$art->enum_activity_type()}) {
 		'messages'				=> $acts, 
 		'keys'					=> [
 										map { 
-											  $instance_name . $_
+											  $instance_id . $_
 										} @$acts 
 								   ],
 		'compressione_codec'	=> undef,
