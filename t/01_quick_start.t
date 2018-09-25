@@ -14,13 +14,13 @@ use Confluent::SchemaRegistry;
 use Test::More qw( no_plan );
 #use Test::More tests => 32;
 
-BEGIN { use_ok('Confluent::Avro::Producer', qq/Using/); }
+BEGIN { use_ok('Kafka::Producer::Avro', qq/Using/); }
 
 sub _nvl_str {
 	return defined $_[0] ? $_[0] : ''; 
 }
 
-my $class = 'Confluent::Avro::Producer';
+my $class = 'Kafka::Producer::Avro';
 
 my $kc = new_ok('Kafka::Connection' => [ 'host','localhost' ]);
 isa_ok($kc, 'Kafka::Connection');

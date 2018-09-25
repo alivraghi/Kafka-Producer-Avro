@@ -1,15 +1,15 @@
-package Confluent::Avro::Producer;
+package Kafka::Producer::Avro;
 
 =pod
 
 =head1 SYNOPSIS
 
     use Kafka::Connection;
-    use Confluent::Avro::Producer;
+    use Kafka::Producer::Avro;
 
     my $connection = Kafka::Connection->new( host => 'localhost' );
 
-    my $producer = Confluent::Avro::Producer->new( Connection => $connection );
+    my $producer = Kafka::Producer::Avro->new( Connection => $connection );
 
     # TODO Interact with Avro & SchemaRegistry before sending messages
 
@@ -26,10 +26,10 @@ package Confluent::Avro::Producer;
 
 =head1 DESCRIPTION
 
-C<Confluent::Avro::Producer> main feature is to provide object-oriented API for 
+C<Kafka::Producer::Avro> main feature is to provide object-oriented API for 
 producing messages according to Confluent Schemaregistry and Avro serialization.
 
-C<Confluent::Avro::Producer> inerhits from and extends L<Kafka::Producer|Kafka::Producer>.
+C<Kafka::Producer::Avro> inerhits from and extends L<Kafka::Producer|Kafka::Producer>.
 
 =cut
 
@@ -248,7 +248,7 @@ Despite L<Kafka::Producer|Kafka::Producer>C<->send()> method that expects positi
 
   $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
 
-C<Confluent::Avro::Producer->send()> method looks for named parameters:
+C<Kafka::Producer::Avro->send()> method looks for named parameters:
 
   $producer->send(
   	topic             => $topic, 
