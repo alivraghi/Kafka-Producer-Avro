@@ -26,8 +26,8 @@ package Kafka::Producer::Avro;
 
 =head1 DESCRIPTION
 
-C<Kafka::Producer::Avro> main feature is to provide object-oriented API for 
-producing messages according to Confluent Schemaregistry and Avro serialization.
+C<Kafka::Producer::Avro> main feature is to provide object-oriented API to 
+produce messages according to I<Confluent SchemaRegistry> and I<Avro> serialization.
 
 C<Kafka::Producer::Avro> inerhits from and extends L<Kafka::Producer|Kafka::Producer>.
 
@@ -69,8 +69,7 @@ In addition, takes in the following arguments:
 
 =item C<SchemaRegistry =E<gt> $schema_registry> (B<mandatory>)
 
-C<$schema_registry> is the L<Confluent::SchemaRegistry|Confluent::SchemaRegistry> object responsible for communication with
-the Confluent Schema Registry that controls the schema version to use to validate and serialize messages.
+Is a L<Confluent::SchemaRegistry|Confluent::SchemaRegistry> instance.
 
 =back
 
@@ -231,53 +230,62 @@ The following methods are defined for the C<Kafka::Avro::Producer> class:
 =cut
 
 
+=head3 C<schema_registry>()
+
+Returns the L<Confluent::SchemaRegistry|Confluent::SchemaRegistry> instance supplied to the construcor.
+
+=cut
+
 sub schema_registry { $_[0]->{__SCHEMA_REGISTRY} }
+
+
+=head3 C<get_error>()
+
+Returns a string containing last error message.
+
+=cut
+
 sub get_error { $_[0]->_get_error() }
 
 
-
-=head3 C<send( $topic, $partition, $messages, $keys, $compression_codec, $json_schema )>
+=head3 C<send( %params )>
 
 Sends a messages on a L<Kafka::Connection|Kafka::Connection> object.
 
 Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
 
-Despite L<Kafka::Producer|Kafka::Producer>C<->send()> method that expects positional arguments:
-
-  $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
-
+Despite L<Kafka::Producer|Kafka::Producer>C<->send()> method that expects positional arguments, 
 C<Kafka::Producer::Avro->send()> method looks for named parameters:
 
   $producer->send(
-  	topic             => $topic, 
-  	partition         => $partition, 
-  	messages          => $messages, 
-  	keys              => $keys, 
-  	compression_codec => $compression_codec, 
-  	key_schema        => $key_schema, 
-  	value_schema      => $value_schema
+  	topic             => $topic,             # scalar 
+  	partition         => $partition,         # scalar
+  	messages          => $messages,          # scalar | array
+  	keys              => $keys,              # scalar | array
+  	compression_codec => $compression_codec, # scalar
+  	key_schema        => $key_schema,        # optional JSON-string
+  	value_schema      => $value_schema       # optional JSON-string
   );    
 
-Extra arguments:
+Extra arguments may be suggested:
 
 =over 3
 
 =item C<key_schema =E<gt> $key_schema> and C<value_schema =E<gt> $value_schema>
 
-Both C<$key_schema> and C<$value_schema> named parametrs are optional and provide JSON strings that represent 
-Avro schemas to validate and serialize key and value messages.
+Both C<$key_schema> and C<$value_schema> parametrs are optional and provide JSON strings that 
+represent Avro schemas to use to validate and serialize key(s) and value(s).
 
 These schemas are validated against C<schema_registry> and, if compliant, they are added to the registry
 under the C<$topic+'key'> or C<$topic+'value'> subjects.
 
-If an expected schema isn't provided, latest version from Schema Registry is used according to the related 
+If an expected schema isn't provided, latest version from Schema Registry is used accordingly to the  
 subject (key or value). 
 
 =back
 
 =cut
-
 
 sub send {
 	my $self = shift;
@@ -369,6 +377,89 @@ sub send {
 }
 
 
+=head3 C<bulk_send( %params )>
+
+Similar to C<send> but uses bulks to avoid memory leaking.
+
+Extra named parametrs are expected:
+
+=over 3
+
+=item C<size =E<gt> $size>
+
+The size of the bulk
+
+=item C<on_before_send_bulk =E<gt> sub {...} > (optional)
+
+A code block that will be executed before the sending of each bulk.
+
+The block will receive the following positional parameters: 
+
+=over 3
+
+=item C<$bulk_num> the number of the bulk
+
+=item C<$bulk_messages> the number of messages in the bulk
+
+=item C<$bulk_keys> the number of keys in the bulk
+
+=item C<$index_from> the absolute index of the first message in the bulk
+
+=item C<$index_to> the absolute index of the last message in the bulk
+
+=back
+
+=item C<on_after_send_bulk =E<gt> sub {...} > (optional)
+
+A code block that will be executed after the sending of each bulk.
+
+The block will receive the following positional parameters: 
+
+=over 3
+
+=item C<$sent> the number of sent messages in the bulk
+
+=item C<$total_sent> the total number of messages sent
+
+=back
+
+=item C<on_init =E<gt> sub {...} > (optional)
+
+A code block that will be executed only once before at the beginning of the cycle.
+
+The block will receive the following positional parameters: 
+
+=over 3
+
+=item C<$to_send> the total number of messages to send 
+
+=item C<$bulk_size> the size of the bulk
+
+=back
+
+=item C<on_complete =E<gt> sub {...} > (optional)
+
+A code block that will be executed only once after the end of the cycle.
+
+The block will receive the following positional parameters: 
+
+=over 3
+
+=item C<$to_send> the total number of messages to send 
+
+=item C<$total_sent> the total number of messages sent
+
+=item C<$errors> the number bulks sent with errors
+
+=back
+
+=item C<on_send_error =E<gt> sub {...} > (optional)
+
+A code block that will be executed when a bulk registers an error.
+
+=back
+
+=cut
 
 sub bulk_send {
 	my $self = shift;
@@ -411,7 +502,6 @@ sub bulk_send {
 	my $bulk_num = 0;
 	
 	if (ref($params{on_init}) eq 'CODE') {
-		# SCALAR $to_send, SCALAR $bulk_size
 		$params{on_init}->($message_count, $bulk_size);
 	}
 	for (my $i=1; $i<=$message_count; $i+=$bulk_size) {
@@ -422,44 +512,30 @@ sub bulk_send {
 			$bulk_keys = [ splice(@keys, 0, $bulk_size) ];
 		}
 		if (ref($params{on_before_send_bulk}) eq 'CODE') {
-			# SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
 			$params{on_before_send_bulk}->($bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
 		}
-#		try {
-			my $res = $self->send(
-				'topic'					=> $params{topic}, 
-				'partition'				=> 0, 
-				'messages'				=> [ @bulk ], 
-				'keys'					=> $bulk_keys,
-				'compressione_codec'	=> undef,
-				'key_schema'			=> $params{key_schema},
-				'value_schema'			=> $params{value_schema}
-			);
-			if (defined $res) {
-				$sent += scalar(@bulk);
-				if (ref($params{on_after_send_bulk}) eq 'CODE') {
-					# SCALAR $bulk_num, SCALAR $sent, SCALAR $total_sent
-					$params{on_after_send_bulk}->(scalar(@bulk), $sent);
-				}
-			} else {
-				$errors++;
-				if (ref($params{on_send_error}) eq 'CODE') {
-					# OBJECT $error, SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
-					$params{on_send_error}->($self->get_error(), $bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
-				}
+		my $res = $self->send(
+			'topic'					=> $params{topic}, 
+			'partition'				=> 0, 
+			'messages'				=> [ @bulk ], 
+			'keys'					=> $bulk_keys,
+			'compressione_codec'	=> undef,
+			'key_schema'			=> $params{key_schema},
+			'value_schema'			=> $params{value_schema}
+		);
+		if (defined $res) {
+			$sent += scalar(@bulk);
+			if (ref($params{on_after_send_bulk}) eq 'CODE') {
+				$params{on_after_send_bulk}->(scalar(@bulk), $sent);
 			}
-#		} catch {
-#			$self->_set_error('Unable to send message(s): ' . $_);
-#			$errors++;
-#			if (ref($params{on_send_error}) eq 'CODE') {
-#				# OBJECT $error, SCALAR $bulk_num, ARRAYREF $bulk_messages, ARRAYREF $bulk_keys, SCALAR index_from, SCALAR index_to
-#				$params{on_send_error}->($self->get_error(), $bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
-#			}
-#			return undef;
-#		}
+		} else {
+			$errors++;
+			if (ref($params{on_send_error}) eq 'CODE') {
+				$params{on_send_error}->($self->get_error(), $bulk_num, \@bulk, $bulk_keys, $i, ($i+$bulk_size<$message_count ? $i+$bulk_size-1 : $message_count));
+			}
+		}
 	}
 	if (ref($params{on_complete}) eq 'CODE') {
-		# SCALAR $total_sent, SCALAR $errors
 		$params{on_complete}->($message_count, $sent, $errors);
 	}
 	return $sent;
@@ -474,7 +550,7 @@ sub bulk_send {
 
 Alvaro Livraghi, E<lt>alvarol@cpan.orgE<gt>
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT AND LICENSE
 
 Copyright 2018 by Alvaro Livraghi
 
