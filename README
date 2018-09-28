@@ -1,0 +1,94 @@
+SYNOPSIS
+        use Kafka::Connection;
+        use Kafka::Producer::Avro;
+
+        my $connection = Kafka::Connection->new( host => 'localhost' );
+
+        my $producer = Kafka::Producer::Avro->new( Connection => $connection );
+
+        # Do some interactions with Avro & SchemaRegistry before sending messages
+
+        # Sending a single message
+        my $response = $producer->send(...);
+
+        # Sending a series of messages
+        $response = $producer->send(...);
+
+        # Closes the producer and cleans up
+        undef $producer;
+        $connection->close;
+        undef $connection;
+
+DESCRIPTION
+    "Kafka::Producer::Avro" main feature is to provide object-oriented API
+    for producing messages according to Confluent Schemaregistry and Avro
+    serialization.
+
+    "Kafka::Producer::Avro" inerhits from and extends Kafka::Producer.
+
+  CONSTRUCTOR
+   "new"
+    Creates new producer client object.
+
+    "new()" takes arguments in key-value pairs as described in
+    Kafka::Producer from which it inherits.
+
+    In addition, takes in the following arguments:
+
+    "SchemaRegistry => $schema_registry" (mandatory)
+       $schema_registry is the Confluent::SchemaRegistry object responsible
+       for communication with the Confluent Schema Registry that controls
+       the schema version to use to validate and serialize messages.
+
+  METHODS
+    The following methods are defined for the "Kafka::Avro::Producer" class:
+
+   "send( $topic, $partition, $messages, $keys, $compression_codec, $json_schema )"
+    Sends a messages on a Kafka::Connection object.
+
+    Returns a non-blank value (a reference to a hash with server response
+    description) if the message is successfully sent.
+
+    Despite Kafka::Producer"-"send()> method that expects positional
+    arguments:
+
+      $producer->send($topic, $partition, $messages, $keys, $compression_codec, $key_schema, $value_schema);
+
+    "Kafka::Producer::Avro-"send()> method looks for named parameters:
+
+      $producer->send(
+            topic             => $topic, 
+            partition         => $partition, 
+            messages          => $messages, 
+            keys              => $keys, 
+            compression_codec => $compression_codec, 
+            key_schema        => $key_schema, 
+            value_schema      => $value_schema
+      );
+
+    Extra arguments:
+
+    "key_schema => $key_schema" and "value_schema => $value_schema"
+       Both $key_schema and $value_schema named parametrs are optional and
+       provide JSON strings that represent Avro schemas to validate and
+       serialize key and value messages.
+
+       These schemas are validated against "schema_registry" and, if
+       compliant, they are added to the registry under the "$topic+'key'" or
+       "$topic+'value'" subjects.
+
+       If an expected schema isn't provided, latest version from Schema
+       Registry is used according to the related subject (key or value).
+
+TODO
+    ...
+
+AUTHOR
+    Alvaro Livraghi, <alvarol@cpan.org>
+
+COPYRIGHT
+    Copyright 2018 by Alvaro Livraghi
+
+    This program is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+

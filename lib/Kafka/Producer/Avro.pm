@@ -11,7 +11,7 @@ package Kafka::Producer::Avro;
 
     my $producer = Kafka::Producer::Avro->new( Connection => $connection );
 
-    # TODO Interact with Avro & SchemaRegistry before sending messages
+    # Do some interactions with Avro & SchemaRegistry before sending messages
 
     # Sending a single message
     my $response = $producer->send(...);
@@ -43,7 +43,6 @@ use Data::Dumper;
 #$Data::Dumper::Purity = 1;
 #$Data::Dumper::Terse = 1;
 #$Data::Dumper::Useqq = 1;
-use Try::Tiny;
 
 use base 'Kafka::Producer';
 
@@ -467,6 +466,21 @@ sub bulk_send {
 	
 }
 
+=head1 TODO
+
+...
+
+=head1 AUTHOR
+
+Alvaro Livraghi, E<lt>alvarol@cpan.orgE<gt>
+
+=head1 COPYRIGHT
+
+Copyright 2018 by Alvaro Livraghi
+
+This program is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+=cut
 
 1;
 
