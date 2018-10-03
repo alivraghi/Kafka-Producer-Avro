@@ -1,3 +1,6 @@
+NAME
+    Kafka::Producer::Avro - Avro message producer for Apache Kafka.
+
 SYNOPSIS
         use Kafka::Connection;
         use Kafka::Producer::Avro;
@@ -131,11 +134,15 @@ DESCRIPTION
     "on_send_error => sub {...} " (optional)
        A code block that will be executed when a bulk registers an error.
 
-TODO
-    ...
-
 AUTHOR
     Alvaro Livraghi, <alvarol@cpan.org>
+
+CONTRIBUTE
+    <https://github.com/alivraghi/Kafka-Producer-Avro>
+
+BUG
+    Please use GitHub project link above to report problems or contact
+    authors.
 
 COPYRIGHT AND LICENSE
     Copyright 2018 by Alvaro Livraghi

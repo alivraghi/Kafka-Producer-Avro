@@ -2,6 +2,10 @@ package Kafka::Producer::Avro;
 
 =pod
 
+=head1 NAME
+
+Kafka::Producer::Avro - Avro message producer for Apache Kafka.
+
 =head1 SYNOPSIS
 
     use Kafka::Connection;
@@ -38,11 +42,6 @@ use strict;
 use warnings;
 
 use JSON::XS;
-
-use Data::Dumper;
-#$Data::Dumper::Purity = 1;
-#$Data::Dumper::Terse = 1;
-#$Data::Dumper::Useqq = 1;
 
 use base 'Kafka::Producer';
 
@@ -107,14 +106,11 @@ sub _encode {
 	my $payload = shift;
 	return undef
 		unless defined $payload;
-#	print Dumper($payload->{id});
-#	print encode_json($payload), "\n";
 	my $encoded = pack('bN', &MAGIC_BYTE, $schema_ref->{id});
 	Avro::BinaryEncoder->encode(
 		schema	=> $schema_ref->{schema},
 		data	=> $payload,
 		emit_cb	=> sub {
-			#print STDERR Dumper(\@_);
 			$encoded .= ${ $_[0] };
 		}
 	);
@@ -542,13 +538,17 @@ sub bulk_send {
 	
 }
 
-=head1 TODO
-
-...
-
 =head1 AUTHOR
 
 Alvaro Livraghi, E<lt>alvarol@cpan.orgE<gt>
+
+=head1 CONTRIBUTE
+
+L<https://github.com/alivraghi/Kafka-Producer-Avro>
+
+=head1 BUG
+
+Please use GitHub project link above to report problems or contact authors.
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -559,6 +559,3 @@ This program is free software; you can redistribute it and/or modify it under th
 =cut
 
 1;
-
-__END__
-
