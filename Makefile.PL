@@ -12,12 +12,14 @@ if ( $^O eq 'MSWin32' || $^O eq 'solaris' ||  $^O eq 'cygwin' ) {
     exit( 255 );
 }
 
-readme_from('lib/Kafka/Producer/Avro.pm');
-`perldoc -uT lib/Kafka/Producer/Avro.pm | pod2markdown - README.md`; # useful for GitHub repo home
+my $package = 'Kafka::Producer::Avro';
+my $path_to_package = 'lib/Kafka/Producer/Avro.pm';
+readme_from($path_to_package);
+`perldoc -uT $path_to_package | pod2markdown - README.md`; # useful for GitHub repo home
 
 my %config = (
-    NAME                => 'Kafka::Producer::Avro',
-    VERSION_FROM        => 'lib/Kafka/Producer/Avro.pm',  # finds $VERSION
+    NAME                => $package,
+    VERSION_FROM        => $path_to_package,  # finds $VERSION
     MIN_PERL_VERSION    => '5.010',
     PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
 		'JSON::XS'					=> '3.02',
