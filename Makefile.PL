@@ -13,6 +13,7 @@ if ( $^O eq 'MSWin32' || $^O eq 'solaris' ||  $^O eq 'cygwin' ) {
 }
 
 readme_from('lib/Kafka/Producer/Avro.pm');
+`perldoc -uT lib/Kafka/Producer/Avro.pm | pod2markdown - README.md`; # useful for GitHub repo home
 
 my %config = (
     NAME                => 'Kafka::Producer::Avro',
