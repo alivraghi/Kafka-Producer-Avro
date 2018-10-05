@@ -51,7 +51,7 @@ use Confluent::SchemaRegistry;
 
 use constant MAGIC_BYTE => 0; 
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head2 CONSTRUCTOR

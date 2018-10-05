@@ -4,8 +4,7 @@ use strict;
 use warnings;
 use 5.010;
 
-use Config;
-use inc::Module::Install;
+use ExtUtils::MakeMaker;
 
 if ( $^O eq 'MSWin32' || $^O eq 'solaris' ||  $^O eq 'cygwin' ) {
     print STDERR "OS unsupported: $^O\n";
@@ -14,7 +13,8 @@ if ( $^O eq 'MSWin32' || $^O eq 'solaris' ||  $^O eq 'cygwin' ) {
 
 my $package = 'Kafka::Producer::Avro';
 my $path_to_package = 'lib/Kafka/Producer/Avro.pm';
-readme_from($path_to_package);
+
+`perldoc -uT $path_to_package | pod2text - README`;
 `perldoc -uT $path_to_package | pod2markdown - README.md`; # useful for GitHub repo home
 
 my %config = (
