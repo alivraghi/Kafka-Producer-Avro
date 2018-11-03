@@ -51,7 +51,7 @@ use Confluent::SchemaRegistry;
 
 use constant MAGIC_BYTE => 0; 
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 =head2 CONSTRUCTOR
@@ -313,6 +313,8 @@ sub send {
 	# Get Avro schema for keys and values
 	foreach my $type (qw/key value/) {
 		($avro_schemas->{$type}->{id}, $avro_schemas->{$type}->{schema}) = $self->_get_avro_schema($params{topic}, $type, $params{"${type}_schema"});
+		return undef
+			unless $avro_schemas->{$type}->{id};
 	}
 
 	if ($params{keys}) {
