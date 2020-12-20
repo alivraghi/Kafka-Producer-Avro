@@ -36,9 +36,9 @@
          "requires" : {
             "Avro::BinaryEncoder" : "0",
             "Avro::Schema" : "0",
-            "Confluent::SchemaRegistry" : "0.03",
-            "JSON::XS" : "3.02",
-            "Kafka::Producer" : "1.07",
+            "Confluent::SchemaRegistry" : "0",
+            "JSON::XS" : "0",
+            "Kafka::Producer" : "0",
             "perl" : "5.010"
          }
       },
@@ -60,5 +60,5 @@
          "web" : "https://github.com/alivraghi/Kafka-Producer-Avro.git"
       }
    },
-   "version" : "0.01"
+   "version" : "0.04"
 }

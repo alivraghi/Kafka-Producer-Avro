@@ -72,9 +72,10 @@ Despite [Kafka::Producer](https://metacpan.org/pod/Kafka::Producer->send\(\)) me
           partition         => $partition,         # scalar
           messages          => $messages,          # scalar | array
           keys              => $keys,              # scalar | array
-          compression_codec => $compression_codec, # scalar
+          compression_codec => $compression_codec, # optional scalar
           key_schema        => $key_schema,        # optional JSON-string
-          value_schema      => $value_schema       # optional JSON-string
+          value_schema      => $value_schema,      # optional JSON-string
+          timestamps        => $timestamps         # optional scalar | array
     );    
 
 Extra arguments may be suggested:
