@@ -51,7 +51,7 @@ use Confluent::SchemaRegistry;
 
 use constant MAGIC_BYTE => 0; 
 
-our $VERSION = '0.02';
+our $VERSION = '0.04';
 
 
 =head2 CONSTRUCTOR
@@ -259,9 +259,10 @@ C<Kafka::Producer::Avro->send()> method looks for named parameters:
   	partition         => $partition,         # scalar
   	messages          => $messages,          # scalar | array
   	keys              => $keys,              # scalar | array
-  	compression_codec => $compression_codec, # scalar
+  	compression_codec => $compression_codec, # optional scalar
   	key_schema        => $key_schema,        # optional JSON-string
-  	value_schema      => $value_schema       # optional JSON-string
+  	value_schema      => $value_schema,      # optional JSON-string
+  	timestamps        => $timestamps         # optional scalar | array
   );    
 
 Extra arguments may be suggested:
@@ -313,6 +314,8 @@ sub send {
 	# Get Avro schema for keys and values
 	foreach my $type (qw/key value/) {
 		($avro_schemas->{$type}->{id}, $avro_schemas->{$type}->{schema}) = $self->_get_avro_schema($params{topic}, $type, $params{"${type}_schema"});
+		return undef
+			unless $avro_schemas->{$type}->{id};
 	}
 
 	if ($params{keys}) {
@@ -367,7 +370,8 @@ sub send {
 		$params{partition},
 		$messages,
 		$keys,
-		$params{compression_codec}
+		$params{compression_codec},
+		$params{timestamps}
 	);
 	
 }
@@ -517,7 +521,8 @@ sub bulk_send {
 			'keys'					=> $bulk_keys,
 			'compressione_codec'	=> undef,
 			'key_schema'			=> $params{key_schema},
-			'value_schema'			=> $params{value_schema}
+			'value_schema'			=> $params{value_schema},
+			'timestamps'			=> $params{timestamps}
 		);
 		if (defined $res) {
 			$sent += scalar(@bulk);

@@ -22,11 +22,11 @@ my %config = (
     VERSION_FROM        => $path_to_package,  # finds $VERSION
     MIN_PERL_VERSION    => '5.010',
     PREREQ_PM           => {            # more to the list $Module::CoreList::version{5.010}
-		'JSON::XS'					=> '3.02',
-		'Kafka::Producer'			=> '1.07',
+		'JSON::XS'					=> 0,
+		'Kafka::Producer'			=> 0,
 		'Avro::BinaryEncoder'		=> 0,
 		'Avro::Schema'				=> 0,
-		'Confluent::SchemaRegistry'	=> '0.03'
+		'Confluent::SchemaRegistry'	=> 0
     },
     TEST_REQUIRES       => {            # more to the list $Module::CoreList::version{5.010}
 		'Math::BigInt'				=> '1.89',
