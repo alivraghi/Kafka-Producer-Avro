@@ -51,8 +51,42 @@ use Confluent::SchemaRegistry;
 
 use constant MAGIC_BYTE => 0; 
 
-our $VERSION = '0.04';
+use version; our $VERSION = version->declare('v1.0.0');
 
+=head1 INSTALL
+
+Installation of C<Kafka::Producer::Avro> is a canonical:
+
+  perl Makefile.PL
+  make
+  make test
+  make install
+
+=head2 TEST NOTES
+
+Tests are focused on verifying Avro-formatted messages and theirs interactions with Confluent Schema Registry and are intended to extend C<Kafka::Producer> test suite.
+
+They expect that in the target are listening Apache Kafka and Schema Registry services, respectively listening on C<localhost:9092> and C<http://localhost:8081>.
+
+You can alternatively set a different URLs by exporting the following environment variable:
+
+=over 3
+
+=item C<KAFKA_HOST>
+
+=item C<KAFKA_PORT>
+
+=item C<CONFLUENT_SCHEMA_REGISTY_URL>
+
+=back
+
+For example:
+
+  export KAFKA_HOST=my-kafka-host.my-domain.org
+  export FALFA_PORT=9092
+  export CONFLUENT_SCHEMA_REGISTY_URL=http://my-schema-registry-host.my-domain.org
+
+=head1 USAGE
 
 =head2 CONSTRUCTOR
 

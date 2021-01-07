@@ -3,14 +3,14 @@
    "author" : [
       "Alvaro Livraghi"
    ],
-   "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.98, CPAN::Meta::Converter version 2.141520",
+   "dynamic_config" : 0,
+   "generated_by" : "ExtUtils::MakeMaker version 7.34, CPAN::Meta::Converter version 2.150010",
    "license" : [
       "perl_5"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
-      "version" : "2"
+      "version" : 2
    },
    "name" : "Kafka-Producer-Avro",
    "no_index" : {
@@ -34,11 +34,11 @@
       },
       "runtime" : {
          "requires" : {
-            "Avro::BinaryEncoder" : "0",
-            "Avro::Schema" : "0",
-            "Confluent::SchemaRegistry" : "0",
-            "JSON::XS" : "0",
-            "Kafka::Producer" : "0",
+            "Avro::BinaryEncoder" : "v1.10.1",
+            "Avro::Schema" : "v1.10.1",
+            "Confluent::SchemaRegistry" : "0.010000",
+            "JSON::XS" : "v4.30.0",
+            "Kafka::Producer" : "v1.8.0",
             "perl" : "5.010"
          }
       },
@@ -60,5 +60,6 @@
          "web" : "https://github.com/alivraghi/Kafka-Producer-Avro.git"
       }
    },
-   "version" : "0.04"
+   "version" : "v1.0.0",
+   "x_serialization_backend" : "JSON::PP version 2.97001"
 }

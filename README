@@ -29,6 +29,37 @@ DESCRIPTION
 
     "Kafka::Producer::Avro" inerhits from and extends Kafka::Producer.
 
+INSTALL
+    Installation of "Kafka::Producer::Avro" is a canonical:
+
+      perl Makefile.PL
+      make
+      make test
+      make install
+
+  TEST NOTES
+    Tests are focused on verifying Avro-formatted messages and theirs
+    interactions with Confluent Schema Registry and are intended to extend
+    "Kafka::Producer" test suite.
+
+    They expect that in the target are listening Apache Kafka and Schema
+    Registry services, respectively listening on "localhost:9092" and
+    "http://localhost:8081".
+
+    You can alternatively set a different URLs by exporting the following
+    environment variable:
+
+    "KAFKA_HOST"
+    "KAFKA_PORT"
+    "CONFLUENT_SCHEMA_REGISTY_URL"
+
+    For example:
+
+      export KAFKA_HOST=my-kafka-host.my-domain.org
+      export FALFA_PORT=9092
+      export CONFLUENT_SCHEMA_REGISTY_URL=http://my-schema-registry-host.my-domain.org
+
+USAGE
   CONSTRUCTOR
    "new"
     Creates new producer client object.

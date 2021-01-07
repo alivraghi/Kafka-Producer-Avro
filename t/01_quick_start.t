@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 #use Test::More qw( no_plan );
-use Test::More tests => 17;
+use Test::More tests => 15;
 
 BEGIN { use_ok('Kafka::Connection'); }
 BEGIN { use_ok('Confluent::SchemaRegistry'); }
@@ -16,20 +16,38 @@ sub _nvl_str {
 
 my $class = 'Kafka::Producer::Avro';
 
-my $kafka_host = 'localhost';
-my $kafka_port = '9092';
+my $kafka_host = $ENV{KAFKA_HOST} || 'localhost';
+my $kafka_port = $ENV{KAFKA_PORT} || '9092';
 my $kc = new_ok('Kafka::Connection' => [ 'host',$kafka_host, 'port',$kafka_port ]);
 isa_ok($kc, 'Kafka::Connection');
 
 SKIP: {
 	my $kafka_connection_metadata;
 	eval { $kafka_connection_metadata = $kc->get_metadata(); };
-	skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 12 if $@;
+	if ($@) {
+		diag(   "\n",
+				"\n",
+				('*' x 80), "\n",
+				"WARNING! Apache Kafka service is not up or isn't listening on ${kafka_host}:${kafka_port}.", "\n",
+				"Please, try setting KAFKA_HOST and KAFKA_PORT environment variables to specify Kafka's host and port.", "\n",
+				('*' x 80) . "\n",
+				"\n");
+		skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 10;
+	}
 	isa_ok($kafka_connection_metadata, 'HASH');
 
-	my $sr_host = 'http://localhost:8081';
-	my $sr = new_ok('Confluent::SchemaRegistry' => [ 'host',$sr_host ]);
-	isa_ok($sr, 'Confluent::SchemaRegistry');
+	my $sr_url = $ENV{CONFLUENT_SCHEMA_REGISTY_URL} || 'http://localhost:8081';
+	my $sr = Confluent::SchemaRegistry->new('host' => $sr_url);
+	unless (ref($sr) eq 'Confluent::SchemaRegistry') {
+		diag(   "\n",
+				"\n",
+				('*' x 80), "\n",
+				"WARNING! Confluent Schema Registry service is not up or isn't listening on $sr_url.", "\n",
+				"Please, try setting CONFLUENT_SCHEMA_REGISTY_URL environment variable to specify it's URL.", "\n",
+				('*' x 80) . "\n",
+				"\n");
+        skip(qq/Confluent Schema Registry service is not up or isn't listening on $sr_url/, 9);
+	}
 
 	my $cap = new_ok($class => [ 'Connection',$kc , 'SchemaRegistry',$sr ], qq/Valid REST client config/);
 	isa_ok($cap, $class);
