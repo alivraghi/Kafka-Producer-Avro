@@ -33,7 +33,7 @@ SKIP: {
 				"Please, try setting KAFKA_HOST and KAFKA_PORT environment variables to specify Kafka's host and port.", "\n",
 				('*' x 80) . "\n",
 				"\n");
-		skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 17;
+		skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 16;
 	}
 	isa_ok($kafka_connection_metadata, 'HASH');
 
@@ -47,7 +47,7 @@ SKIP: {
 				"Please, try setting CONFLUENT_SCHEMA_REGISTY_URL environment variable to specify it's URL.", "\n",
 				('*' x 80) . "\n",
 				"\n");
-        skip(qq/Confluent Schema Registry service is not up or isn't listening on $sr_url/, 16);
+        skip(qq/Confluent Schema Registry service is not up or isn't listening on $sr_url/, 15);
 	}
 
 	my $cap = new_ok($class => [ 'Connection',$kc , 'SchemaRegistry',$sr ], qq/Valid REST client config/);
