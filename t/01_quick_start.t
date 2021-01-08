@@ -241,7 +241,7 @@ VALUE_SCHEMA
 	$res = $cap->send(
 		$topic, 
 		$partition, 
-		{ f1 => ('0' x ($Kafka::DEFAULT_MAX_BYTES - 100)) }
+		{ f1 => ('\0' x ($Kafka::DEFAULT_MAX_BYTES - 100)) }
 	);
 	isa_ok($res, 'HASH', 'Big message: ' . _nvl_str($cap->_get_error()));
 
