@@ -8,25 +8,79 @@ Kafka::Producer::Avro - Avro message producer for Apache Kafka.
 
 =head1 SYNOPSIS
 
-    use Kafka::Connection;
-    use Kafka::Producer::Avro;
-
-    my $connection = Kafka::Connection->new( host => 'localhost' );
-
-    my $producer = Kafka::Producer::Avro->new( Connection => $connection );
-
-    # Do some interactions with Avro & SchemaRegistry before sending messages
-
-    # Sending a single message
-    my $response = $producer->send(...);
-
-    # Sending a series of messages
-    $response = $producer->send(...);
-
-    # Closes the producer and cleans up
-    undef $producer;
-    $connection->close;
-    undef $connection;
+  use Kafka::Connection;
+  use Kafka::Producer::Avro;
+  
+  my $connection = Kafka::Connection->new( host => 'localhost' );
+  
+  my $producer = Kafka::Producer::Avro->new( Connection => $connection , SchemaRegistry => Confluent::SchemaRegistry->new() );
+  
+  # Set Avro schema for message key (valid JSON-string)
+  my $key_schema = <<KEY_SCHEMA;
+  	{
+  		"type": "long",
+  		"name": "_id"
+  	}
+  KEY_SCHEMA
+  # Set Avro schema for message value (payload) (valid JSON-string)
+  my $value_schema = <<VALUE_SCHEMA;
+  	{
+  		"type": "record",
+  		"name": "myrecord",
+  		"fields": [
+  			{
+  				"name": "f1",
+  				"type": "string"
+  			}
+  		]
+  	}
+  VALUE_SCHEMA
+  
+  # Sending a single message
+  my $response = $producer->send(
+  	'mytopic',          # topic
+  	0,                  # partition
+  	'Single message',   # message
+  	undef,              # key
+  	undef,              # compression_codec
+  	undef,              # timestamps
+  	$key_schema,        # key_schema
+  	$value_schema       # value_schema
+  );
+  
+  # Sending a series of messages
+  $response = $producer->send(
+  	'mytopic',          # topic
+  	0,                  # partition
+  	[                   # messages
+  		'The first message',
+  		'The second message',
+  		'The third message',
+  	],
+  	undef,              # key(s)
+  	undef,              # compression_codec
+  	undef,              # timestamp(s)
+  	$key_schema,        # key_schema
+  	$value_schema       # value_schema
+  );
+  
+  # ...or use named parameters
+  
+  $producer->send(
+  	topic             => $topic,
+  	partition         => $partition,
+  	messages          => $messages,
+  	keys              => $keys,
+  	compression_codec => $compression_codec,
+  	timestamps        => $timestamps,
+  	key_schema        => $key_schema,
+  	value_schema      => $value_schema
+  );    
+  
+  # Closes the producer and cleans up
+  undef $producer;
+  $connection->close;
+  undef $connection;
 
 =head1 DESCRIPTION
 
@@ -327,7 +381,6 @@ Alternatively, for ease of use, the C<send()> method may be also used by suggest
 
 sub send {
     my $self   = shift;
-    use Data::Dump qw/dump/;
     my %params = (
         'topic'             => undef,
         'partition'         => undef,
@@ -339,7 +392,6 @@ sub send {
         'value_schema'      => undef  # optional in Kafka::Producer::Avro
     );
     my @p = @_;
-	#print STDERR dump(\@p);
     my $is_positional = 0;
     if ( scalar(@p) % 2 == 0 ) {
         for ( my $i = 0 ; $i < scalar(@p)-1 ; $i += 2 ) {
@@ -364,7 +416,6 @@ sub send {
         $params{key_schema}        = shift @p;
         $params{value_schema}      = shift @p;
 	}
-	#print STDERR dump(\%params);
 	my $avro_schemas = {
 		key => {
 			id => undef,

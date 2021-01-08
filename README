@@ -2,25 +2,79 @@ NAME
     Kafka::Producer::Avro - Avro message producer for Apache Kafka.
 
 SYNOPSIS
-        use Kafka::Connection;
-        use Kafka::Producer::Avro;
-
-        my $connection = Kafka::Connection->new( host => 'localhost' );
-
-        my $producer = Kafka::Producer::Avro->new( Connection => $connection );
-
-        # Do some interactions with Avro & SchemaRegistry before sending messages
-
-        # Sending a single message
-        my $response = $producer->send(...);
-
-        # Sending a series of messages
-        $response = $producer->send(...);
-
-        # Closes the producer and cleans up
-        undef $producer;
-        $connection->close;
-        undef $connection;
+      use Kafka::Connection;
+      use Kafka::Producer::Avro;
+  
+      my $connection = Kafka::Connection->new( host => 'localhost' );
+  
+      my $producer = Kafka::Producer::Avro->new( Connection => $connection , SchemaRegistry => Confluent::SchemaRegistry->new() );
+  
+      # Set Avro schema for message key (valid JSON-string)
+      my $key_schema = <<KEY_SCHEMA;
+            {
+                    "type": "long",
+                    "name": "_id"
+            }
+      KEY_SCHEMA
+      # Set Avro schema for message value (payload) (valid JSON-string)
+      my $value_schema = <<VALUE_SCHEMA;
+            {
+                    "type": "record",
+                    "name": "myrecord",
+                    "fields": [
+                            {
+                                    "name": "f1",
+                                    "type": "string"
+                            }
+                    ]
+            }
+      VALUE_SCHEMA
+  
+      # Sending a single message
+      my $response = $producer->send(
+            'mytopic',          # topic
+            0,                  # partition
+            'Single message',   # message
+            undef,              # key
+            undef,              # compression_codec
+            undef,              # timestamps
+            $key_schema,        # key_schema
+            $value_schema       # value_schema
+      );
+  
+      # Sending a series of messages
+      $response = $producer->send(
+            'mytopic',          # topic
+            0,                  # partition
+            [                   # messages
+                    'The first message',
+                    'The second message',
+                    'The third message',
+            ],
+            undef,              # key(s)
+            undef,              # compression_codec
+            undef,              # timestamp(s)
+            $key_schema,        # key_schema
+            $value_schema       # value_schema
+      );
+  
+      # ...or use named parameters
+  
+      $producer->send(
+            topic             => $topic,
+            partition         => $partition,
+            messages          => $messages,
+            keys              => $keys,
+            compression_codec => $compression_codec,
+            timestamps        => $timestamps,
+            key_schema        => $key_schema,
+            value_schema      => $value_schema
+      );    
+  
+      # Closes the producer and cleans up
+      undef $producer;
+      $connection->close;
+      undef $connection;
 
 DESCRIPTION
     "Kafka::Producer::Avro" main feature is to provide object-oriented API
