@@ -6,19 +6,73 @@ Kafka::Producer::Avro - Avro message producer for Apache Kafka.
 
     use Kafka::Connection;
     use Kafka::Producer::Avro;
-
+    
     my $connection = Kafka::Connection->new( host => 'localhost' );
-
-    my $producer = Kafka::Producer::Avro->new( Connection => $connection );
-
-    # Do some interactions with Avro & SchemaRegistry before sending messages
-
+    
+    my $producer = Kafka::Producer::Avro->new( Connection => $connection , SchemaRegistry => Confluent::SchemaRegistry->new() );
+    
+    # Set Avro schema for message key (valid JSON-string)
+    my $key_schema = <<KEY_SCHEMA;
+          {
+                  "type": "long",
+                  "name": "_id"
+          }
+    KEY_SCHEMA
+    # Set Avro schema for message value (payload) (valid JSON-string)
+    my $value_schema = <<VALUE_SCHEMA;
+          {
+                  "type": "record",
+                  "name": "myrecord",
+                  "fields": [
+                          {
+                                  "name": "f1",
+                                  "type": "string"
+                          }
+                  ]
+          }
+    VALUE_SCHEMA
+    
     # Sending a single message
-    my $response = $producer->send(...);
-
+    my $response = $producer->send(
+          'mytopic',          # topic
+          0,                  # partition
+          'Single message',   # message
+          undef,              # key
+          undef,              # compression_codec
+          undef,              # timestamps
+          $key_schema,        # key_schema
+          $value_schema       # value_schema
+    );
+    
     # Sending a series of messages
-    $response = $producer->send(...);
-
+    $response = $producer->send(
+          'mytopic',          # topic
+          0,                  # partition
+          [                   # messages
+                  'The first message',
+                  'The second message',
+                  'The third message',
+          ],
+          undef,              # key(s)
+          undef,              # compression_codec
+          undef,              # timestamp(s)
+          $key_schema,        # key_schema
+          $value_schema       # value_schema
+    );
+    
+    # ...or use named parameters
+    
+    $producer->send(
+          topic             => $topic,
+          partition         => $partition,
+          messages          => $messages,
+          keys              => $keys,
+          compression_codec => $compression_codec,
+          timestamps        => $timestamps,
+          key_schema        => $key_schema,
+          value_schema      => $value_schema
+    );    
+    
     # Closes the producer and cleans up
     undef $producer;
     $connection->close;
@@ -29,7 +83,36 @@ Kafka::Producer::Avro - Avro message producer for Apache Kafka.
 `Kafka::Producer::Avro` main feature is to provide object-oriented API to 
 produce messages according to _Confluent SchemaRegistry_ and _Avro_ serialization.
 
-`Kafka::Producer::Avro` inerhits from and extends [Kafka::Producer](https://metacpan.org/pod/Kafka::Producer).
+`Kafka::Producer::Avro` inerhits from and extends [Kafka::Producer](https://metacpan.org/pod/Kafka%3A%3AProducer).
+
+# INSTALL
+
+Installation of `Kafka::Producer::Avro` is a canonical:
+
+    perl Makefile.PL
+    make
+    make test
+    make install
+
+## TEST NOTES
+
+Tests are focused on verifying Avro-formatted messages and theirs interactions with Confluent Schema Registry and are intended to extend `Kafka::Producer` test suite.
+
+They expect that in the target are listening Apache Kafka and Schema Registry services, respectively listening on `localhost:9092` and `http://localhost:8081`.
+
+You can alternatively set a different URLs by exporting the following environment variable:
+
+- `KAFKA_HOST`
+- `KAFKA_PORT`
+- `CONFLUENT_SCHEMA_REGISTY_URL`
+
+For example:
+
+    export KAFKA_HOST=my-kafka-host.my-domain.org
+    export FALFA_PORT=9092
+    export CONFLUENT_SCHEMA_REGISTY_URL=http://my-schema-registry-host.my-domain.org
+
+# USAGE
 
 ## CONSTRUCTOR
 
@@ -37,13 +120,13 @@ produce messages according to _Confluent SchemaRegistry_ and _Avro_ serializatio
 
 Creates new producer client object.
 
-`new()` takes arguments in key-value pairs as described in [Kafka::Producer](https://metacpan.org/pod/Kafka::Producer) from which it inherits.
+`new()` takes arguments in key-value pairs as described in [Kafka::Producer](https://metacpan.org/pod/Kafka%3A%3AProducer) from which it inherits.
 
 In addition, takes in the following arguments:
 
 - `SchemaRegistry => $schema_registry` (**mandatory**)
 
-    Is a [Confluent::SchemaRegistry](https://metacpan.org/pod/Confluent::SchemaRegistry) instance.
+    Is a [Confluent::SchemaRegistry](https://metacpan.org/pod/Confluent%3A%3ASchemaRegistry) instance.
 
 ## METHODS
 
@@ -51,45 +134,56 @@ The following methods are defined for the `Kafka::Avro::Producer` class:
 
 ### `schema_registry`()
 
-Returns the [Confluent::SchemaRegistry](https://metacpan.org/pod/Confluent::SchemaRegistry) instance supplied to the construcor.
+Returns the [Confluent::SchemaRegistry](https://metacpan.org/pod/Confluent%3A%3ASchemaRegistry) instance supplied to the construcor.
 
 ### `get_error`()
 
 Returns a string containing last error message.
 
-### `send( %params )`
+### `send( $topic, $partition, $messages, $keys, $compression_codec, $timestamps, $key_schema, $value_schema )`
 
-Sends a messages on a [Kafka::Connection](https://metacpan.org/pod/Kafka::Connection) object.
+### `send( %named_params )`
+
+Sends Avro-formatted messages on a [Kafka::Connection](https://metacpan.org/pod/Kafka%3A%3AConnection) object.
 
 Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
 
-Despite [Kafka::Producer](https://metacpan.org/pod/Kafka::Producer->send\(\)) method that expects positional arguments, 
-`Kafka::Producer::Avro-`send()> method looks for named parameters:
+In order to handle Avro format, `Kafka::Producer|Kafka::Producer` `send()` method is extended
+with two more positional arguments, `$key_schema` and `$value_schema`:
+
+    $producer->send(
+          $topic,             # scalar 
+          $partition,         # scalar
+          $messages,          # scalar | array
+          $keys,              # (optional) undef | scalar | array
+          $compression_codec, # (optional) undef | scalar
+          $timestamps,        # (optional) undef | scalar | array
+          $key_schema,        # (optional) undef | JSON-string
+          $value_schema       # (optional) undef | JSON-string
+    );
+
+Both `$key_schema` and `$value_schema` parameters are optional and must provide JSON strings that 
+represent Avro schemas to use to validate and serialize key(s) and value(s).
+
+These schemas are validated against `$schema_registry` and, if compliant, they are added to the registry
+under the `$topic+'key'` or `$topic+'value'` Schema Registry's subjects.
+
+If an expected schema isn't provided, latest version from Schema Registry is used accordingly to the  
+(topic + key/value) subject. 
+
+Alternatively, for ease of use, the `send()` method may be also used by suggesting named parameters:
 
     $producer->send(
           topic             => $topic,             # scalar 
           partition         => $partition,         # scalar
           messages          => $messages,          # scalar | array
-          keys              => $keys,              # scalar | array
-          compression_codec => $compression_codec, # optional scalar
-          key_schema        => $key_schema,        # optional JSON-string
-          value_schema      => $value_schema,      # optional JSON-string
-          timestamps        => $timestamps         # optional scalar | array
+          keys              => $keys,              # (optional) undef | scalar | array
+          compression_codec => $compression_codec, # (optional) undef | scalar
+          timestamps        => $timestamps,        # (optional) undef | scalar | array
+          key_schema        => $key_schema,        # (optional) undef | JSON-string
+          value_schema      => $value_schema       # (optional) undef | JSON-string
     );    
-
-Extra arguments may be suggested:
-
-- `key_schema => $key_schema` and `value_schema => $value_schema`
-
-    Both `$key_schema` and `$value_schema` parameters are optional and provide JSON strings that 
-    represent Avro schemas to use to validate and serialize key(s) and value(s).
-
-    These schemas are validated against `schema_registry` and, if compliant, they are added to the registry
-    under the `$topic+'key'` or `$topic+'value'` subjects.
-
-    If an expected schema isn't provided, latest version from Schema Registry is used accordingly to the  
-    subject (key or value). 
 
 ### `bulk_send( %params )`
 
