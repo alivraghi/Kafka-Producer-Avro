@@ -30,7 +30,8 @@ my %config = (
     },
     TEST_REQUIRES       => {            # more to the list $Module::CoreList::version{5.010}
 		'Math::BigInt'				=> '1.89',
-		'Test::Exception'			=> '0.43'
+		'Test::Exception'			=> '0.43',
+        'Time::HiRes'               => '0'
     },
     META_MERGE          => {
         no_index                => {

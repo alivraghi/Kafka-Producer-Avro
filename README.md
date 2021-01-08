@@ -86,39 +86,50 @@ Returns the [Confluent::SchemaRegistry](https://metacpan.org/pod/Confluent%3A%3A
 
 Returns a string containing last error message.
 
-### `send( %params )`
+### `send( $topic, $partition, $messages, $keys, $compression_codec, $timestamps, $key_schema, $value_schema )`
 
-Sends a messages on a [Kafka::Connection](https://metacpan.org/pod/Kafka%3A%3AConnection) object.
+### `send( %named_params )`
+
+Sends Avro-formatted messages on a [Kafka::Connection](https://metacpan.org/pod/Kafka%3A%3AConnection) object.
 
 Returns a non-blank value (a reference to a hash with server response description)
 if the message is successfully sent.
 
-Despite [Kafka::Producer](https://metacpan.org/pod/Kafka%3A%3AProducer-%3Esend%28%29) method that expects positional arguments, 
-`Kafka::Producer::Avro-`send()> method looks for named parameters:
+In order to handle Avro format, `Kafka::Producer|Kafka::Producer` `send()` method is extended
+with two more positional arguments, `$key_schema` and `$value_schema`:
+
+    $producer->send(
+          $topic,             # scalar 
+          $partition,         # scalar
+          $messages,          # scalar | array
+          $keys,              # (optional) undef | scalar | array
+          $compression_codec, # (optional) undef | scalar
+          $timestamps,        # (optional) undef | scalar | array
+          $key_schema,        # (optional) undef | JSON-string
+          $value_schema       # (optional) undef | JSON-string
+    );
+
+Both `$key_schema` and `$value_schema` parameters are optional and must provide JSON strings that 
+represent Avro schemas to use to validate and serialize key(s) and value(s).
+
+These schemas are validated against `$schema_registry` and, if compliant, they are added to the registry
+under the `$topic+'key'` or `$topic+'value'` Schema Registry's subjects.
+
+If an expected schema isn't provided, latest version from Schema Registry is used accordingly to the  
+(topic + key/value) subject. 
+
+Alternatively, for ease of use, the `send()` method may be also used by suggesting named parameters:
 
     $producer->send(
           topic             => $topic,             # scalar 
           partition         => $partition,         # scalar
           messages          => $messages,          # scalar | array
-          keys              => $keys,              # scalar | array
-          compression_codec => $compression_codec, # optional scalar
-          key_schema        => $key_schema,        # optional JSON-string
-          value_schema      => $value_schema,      # optional JSON-string
-          timestamps        => $timestamps         # optional scalar | array
+          keys              => $keys,              # (optional) undef | scalar | array
+          compression_codec => $compression_codec, # (optional) undef | scalar
+          timestamps        => $timestamps,        # (optional) undef | scalar | array
+          key_schema        => $key_schema,        # (optional) undef | JSON-string
+          value_schema      => $value_schema       # (optional) undef | JSON-string
     );    
-
-Extra arguments may be suggested:
-
-- `key_schema => $key_schema` and `value_schema => $value_schema`
-
-    Both `$key_schema` and `$value_schema` parameters are optional and provide JSON strings that 
-    represent Avro schemas to use to validate and serialize key(s) and value(s).
-
-    These schemas are validated against `schema_registry` and, if compliant, they are added to the registry
-    under the `$topic+'key'` or `$topic+'value'` subjects.
-
-    If an expected schema isn't provided, latest version from Schema Registry is used accordingly to the  
-    subject (key or value). 
 
 ### `bulk_send( %params )`
 
