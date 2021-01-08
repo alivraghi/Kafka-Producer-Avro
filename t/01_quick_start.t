@@ -4,8 +4,9 @@ use strict;
 use warnings;
 
 #use Test::More qw( no_plan );
-use Test::More tests => 22;
+use Test::More tests => 23;
 
+BEGIN { use_ok('Kafka'); }
 BEGIN { use_ok('Kafka::Connection'); }
 BEGIN { use_ok('Confluent::SchemaRegistry'); }
 BEGIN { use_ok('Kafka::Producer::Avro'); }
@@ -33,7 +34,7 @@ SKIP: {
 				"Please, try setting KAFKA_HOST and KAFKA_PORT environment variables to specify Kafka's host and port.", "\n",
 				('*' x 80) . "\n",
 				"\n");
-		skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 16;
+		skip "Unable to get Kafka metadata at ${kafka_host}:${kafka_port}", 17;
 	}
 	isa_ok($kafka_connection_metadata, 'HASH');
 
@@ -47,7 +48,7 @@ SKIP: {
 				"Please, try setting CONFLUENT_SCHEMA_REGISTY_URL environment variable to specify it's URL.", "\n",
 				('*' x 80) . "\n",
 				"\n");
-        skip(qq/Confluent Schema Registry service is not up or isn't listening on $sr_url/, 15);
+        skip(qq/Confluent Schema Registry service is not up or isn't listening on $sr_url/, 16);
 	}
 
 	my $cap = new_ok($class => [ 'Connection',$kc , 'SchemaRegistry',$sr ], qq/Valid REST client config/);
@@ -241,11 +242,14 @@ VALUE_SCHEMA
 	$res = $cap->send(
 		$topic, 
 		$partition, 
-		{ f1 => ('\0' x ($Kafka::DEFAULT_MAX_BYTES - 100)) }
+		{ f1 => ('0' x ($Kafka::DEFAULT_MAX_BYTES - 1024)) }
 	);
-	isa_ok($res, 'HASH', 'Big message: ' . _nvl_str($cap->_get_error()));
+	isa_ok($res, 'HASH', 'Big message');
+
+	# Clear Schema Registry subjects used for testing
+	$cap->schema_registry()->delete_subject(SUBJECT => $topic, TYPE => 'key');
+	$cap->schema_registry()->delete_subject(SUBJECT => $topic, TYPE => 'value');
 
 }
 
 $kc->close();
-
